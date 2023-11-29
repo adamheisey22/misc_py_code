@@ -1,41 +1,38 @@
 import requests
 import pandas as pd
 
-def fetch_eia_data(api_key, start_date, end_date, length=5000):
-    url = 'https://api.eia.gov/v2/electricity/rto/region-sub-ba-data/data/'
-    
-    # Define the API parameters
-    params = {
-        'api_key': api_key,
-        'frequency': 'hourly',
-        'data[0]': 'value',
-        'start': start_date,
-        'end': end_date,
-        'sort[0][column]': 'period',
-        'sort[0][direction]': 'desc',
-        'offset': 0,
-        'length': length,
-    }
+def fetch_eia_data(api_url):
+    response = requests.get(api_url)
 
-    # Make the API request
-    response = requests.get(url, params=params)
-    data = response.json()
+    if response.status_code == 200:
+        data = response.json()
+        return data
+    else:
+        print(f"Error: {response.status_code}")
+        return None
 
-    # Extract the relevant data from the response
-    series_data = data['series'][0]['data']
+def convert_to_dataframe(api_data):
+    try:
+        series_data = api_data['response']['data']
+        df = pd.DataFrame(series_data)
+        df['period'] = pd.to_datetime(df['period'])
+        return df
+    except KeyError as e:
+        print(f"KeyError: {e}")
+        return None
 
-    # Convert the data to a Pandas DataFrame
-    df = pd.DataFrame(series_data)
+if __name__ == "__main__":
+    api_url = "https://api.eia.gov/v2/electricity/rto/region-sub-ba-data/data/?api_key=WOLU5avflX0tFNVkVuShl4z2Pj3vyee7Z5n40O46&frequency=hourly&data[0]=value&start=2023-01-01T00&end=2023-01-02T00&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000"
 
-    return df
+    api_data = fetch_eia_data(api_url)
 
-# Example usage:
-api_key = 'YOUR_EIA_API_KEY'
-start_date = '2023-01-01T00:00:00'
-end_date = '2023-01-02T00:00:00'
-length = 5000
+    if api_data is not None:
+        print(api_data)
+        df = convert_to_dataframe(api_data)
 
-eia_dataframe = fetch_eia_data(api_key, start_date, end_date, length)
-
-# Display the resulting DataFrame
-print(eia_dataframe)
+        if df is not None:
+            print(df.head())
+        else:
+            print("Failed to convert data to DataFrame.")
+    else:
+        print("Failed to fetch data.")
