@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import fastparquet as fp
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 def fetch_eia_data(api_url, offset, length):
     params = {
@@ -45,34 +46,33 @@ def save_to_parquet_batch(dataframes, file_path):
     # Write the combined dataframe to the Parquet file
     fp.write(file_path, combined_df, compression='SNAPPY', row_group_offsets=500000)
 
+def parallel_fetch_and_save(api_url, offsets, chunk_size, file_path):
+    with ThreadPoolExecutor(max_workers=len(offsets)) as executor:
+        # Perform parallel requests
+        results = list(executor.map(fetch_eia_data, [api_url] * len(offsets), offsets, [chunk_size] * len(offsets)))
+
+    # Process results
+    dataframes_batch = [convert_to_dataframe(result) for result in results if result is not None and 'response' in result]
+    
+    # Save accumulated dataframes in a batch to the Parquet file
+    save_to_parquet_batch(dataframes_batch, file_path)
+
 if __name__ == "__main__":
     api_url = "https://api.eia.gov/v2/electricity/rto/region-sub-ba-data/data/?frequency=hourly&data[0]=value&sort[0][column]=period&sort[0][direction]=desc"
     chunk_size = 5000
     current_offset = 0
-    dataframes_batch = []
+    total_data = 100000  # Specify the total number of records you want to fetch
+    batch_size = 10  # Number of parallel requests in each batch
+    file_path = "output_data.parquet"
 
-    while True:
-        print(f"Fetching data for offset {current_offset} to {current_offset + chunk_size}")
-        
-        api_data = fetch_eia_data(api_url, offset=current_offset, length=chunk_size)
-        
-        if api_data is not None:
-            df = convert_to_dataframe(api_data)
-            
-            if df is not None and not df.empty:
-                print(df.head())
-                
-                # Accumulate dataframes in the batch
-                dataframes_batch.append(df)
-                
-                # Update offset for the next iteration
-                current_offset += chunk_size
-            else:
-                print("No more data available.")
-                break
-        else:
-            print("Failed to fetch data.")
-            break
+    while current_offset < total_data:
+        print(f"Fetching data for offset {current_offset} to {current_offset + chunk_size * batch_size - 1}")
 
-    # Save accumulated dataframes in a batch to the Parquet file
-    save_to_parquet_batch(dataframes_batch, "output_data.parquet")
+        # Generate offsets for parallel requests
+        offsets = [current_offset + i * chunk_size for i in range(batch_size)]
+
+        # Perform parallel fetch and save
+        parallel_fetch_and_save(api_url, offsets, chunk_size, file_path)
+
+        # Update offset for the next iteration
+        current_offset += chunk_size * batch_size
