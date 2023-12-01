@@ -31,20 +31,25 @@ def convert_to_dataframe(api_data):
         print(f"KeyError: {e}")
         return None
 
-def save_to_parquet(df, file_path):
+def save_to_parquet_batch(dataframes, file_path):
+    # Concatenate all dataframes in the list
+    combined_df = pd.concat(dataframes, ignore_index=True)
+
     # Check if the file exists
     try:
         existing_df = pd.read_parquet(file_path)
-        combined_df = pd.concat([existing_df, df], ignore_index=True)
+        combined_df = pd.concat([existing_df, combined_df], ignore_index=True)
     except FileNotFoundError:
-        combined_df = df
+        pass
 
+    # Write the combined dataframe to the Parquet file
     fp.write(file_path, combined_df, compression='SNAPPY', row_group_offsets=500000)
 
 if __name__ == "__main__":
     api_url = "https://api.eia.gov/v2/electricity/rto/region-sub-ba-data/data/?frequency=hourly&data[0]=value&sort[0][column]=period&sort[0][direction]=desc"
     chunk_size = 5000
     current_offset = 0
+    dataframes_batch = []
 
     while True:
         print(f"Fetching data for offset {current_offset} to {current_offset + chunk_size}")
@@ -57,8 +62,8 @@ if __name__ == "__main__":
             if df is not None and not df.empty:
                 print(df.head())
                 
-                # Save data to Parquet file (append mode)
-                save_to_parquet(df, "output_data.parquet")
+                # Accumulate dataframes in the batch
+                dataframes_batch.append(df)
                 
                 # Update offset for the next iteration
                 current_offset += chunk_size
@@ -68,3 +73,6 @@ if __name__ == "__main__":
         else:
             print("Failed to fetch data.")
             break
+
+    # Save accumulated dataframes in a batch to the Parquet file
+    save_to_parquet_batch(dataframes_batch, "output_data.parquet")
