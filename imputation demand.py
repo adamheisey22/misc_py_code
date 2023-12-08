@@ -1,6 +1,6 @@
 import pandas as pd
 
-def impute_demand(df):
+def impute_demand(df, exception_list, demand_range_table):
     # Convert 'Date' to datetime format
     df['Date'] = pd.to_datetime(df['Date'])
 
@@ -12,10 +12,12 @@ def impute_demand(df):
         df.loc[ba_mask & forecast_mask & pd.isna(df['Demand']), 'Demand'] = df['Forecast']
 
         # Rule 2: Use prior hour's demand value if valid
-        df.loc[ba_mask & pd.isna(df['Demand']), 'Demand'] = df['Hour'].map(df[ba_mask & ((df['Hour'] == 1) | ((df['Hour'] > 1) & (df['Hour'] == df['Hour'] - 1)))]['Demand'])
+        prior_hour_mask = (df['Hour'] > 1) & pd.isna(df['Demand'])
+        df.loc[ba_mask & prior_hour_mask, 'Demand'] = df['Hour'].map(df[ba_mask & (df['Hour'] == df['Hour'] - 1)]['Demand'])
 
-        # Rule 3: Use prior day's demand value for the corresponding hour if valid
-        df.loc[ba_mask & pd.isna(df['Demand']), 'Demand'] = df['Hour'].map(df[ba_mask & ((df['Hour'] == 1) | ((df['Hour'] > 1) & (df['Hour'] == df['Hour'] - 24)))]['Demand'])
+        # Rule 3: Use corresponding hour from the prior day if valid
+        prior_day_mask = (df['Hour'] == 1) & pd.isna(df['Demand'])
+        df.loc[ba_mask & prior_day_mask, 'Demand'] = df['Hour'].map(df[ba_mask & (df['Hour'] == df['Hour'] - 24)]['Demand'])
 
         # Rule 3 failed, impute a value of 0
         df.loc[ba_mask & pd.isna(df['Demand']), 'Demand'] = 0
@@ -28,10 +30,10 @@ def impute_demand(df):
             df.loc[ba_mask & range_mask & forecast_mask, 'Demand'] = df['Forecast']
 
             # Rule 2: Use prior hour's demand value if valid
-            df.loc[ba_mask & range_mask, 'Demand'] = df['Hour'].map(df[ba_mask & ((df['Hour'] == 1) | ((df['Hour'] > 1) & (df['Hour'] == df['Hour'] - 1)))]['Demand'])
+            df.loc[ba_mask & range_mask & prior_hour_mask, 'Demand'] = df['Hour'].map(df[ba_mask & (df['Hour'] == df['Hour'] - 1)]['Demand'])
 
-            # Rule 3: Use prior day's demand value for the corresponding hour if valid
-            df.loc[ba_mask & range_mask, 'Demand'] = df['Hour'].map(df[ba_mask & ((df['Hour'] == 1) | ((df['Hour'] > 1) & (df['Hour'] == df['Hour'] - 24)))]['Demand'])
+            # Rule 3: Use corresponding hour from the prior day if valid
+            df.loc[ba_mask & range_mask & prior_day_mask, 'Demand'] = df['Hour'].map(df[ba_mask & (df['Hour'] == df['Hour'] - 24)]['Demand'])
 
             # Rule 3 failed, impute a value of 0
             df.loc[ba_mask & range_mask, 'Demand'] = 0
@@ -42,4 +44,4 @@ def impute_demand(df):
     return df
 
 # Example usage:
-# df = impute_demand(df)
+# df = impute_demand(df, exception_list, demand_range_table)
