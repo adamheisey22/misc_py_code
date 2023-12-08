@@ -44,4 +44,16 @@ def impute_demand(df, exception_list, demand_range_table):
             # Rule 3: Use corresponding hour from the prior day if valid
             df.loc[ba_mask & range_mask & prior_day_mask, 'Demand'] = df['Date'] + pd.DateOffset(days=-1)
             df.loc[ba_mask & range_mask & prior_day_mask, 'Demand'] = df.loc[ba_mask & range_mask & prior_day_mask].apply(
-                lambda row: df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]['Demand'].values[0] if len(df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]) > 0 else N
+                lambda row: df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]['Demand'].values[0] if len(df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]) > 0 else None, axis=1
+            )
+
+            # Rule 3 failed, impute a value of 0
+            df.loc[ba_mask & range_mask, 'Demand'] = 0
+
+    # Sort the DataFrame by 'Date' and 'Hour'
+    df.sort_values(by=['Date', 'Hour'], inplace=True)
+
+    return df
+
+# Example usage:
+# df = impute_demand(df, exception_list, demand_range_table)
