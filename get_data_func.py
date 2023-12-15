@@ -17,9 +17,9 @@ def download_and_merge_csv(years, output_db):
     merged_data = pd.concat(all_data, ignore_index=True)
 
     # Write the concatenated data to an SQLite database
-    merged_data.to_sql('eia930_balance', sqlite3.connect(output_db), index=False, if_exists='replace')
+    merged_data.to_sql('eia930_balance_1', sqlite3.connect(output_db), index=False, if_exists='replace')
 
     print(f'Data for years {", ".join(map(str, years))} has been downloaded and written to {output_db}.')
 
 # Specify the years and the output SQLite database file
-download_and_merge_csv([2022, 2023], 'eia930_balance.db')
+download_and_merge_csv([2022, 2023], 'eia930_balance_1.db')

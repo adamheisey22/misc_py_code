@@ -14,15 +14,15 @@ for year in "${years[@]}"; do
 
     # Download CSV files and store their paths
     csv_files+=("EIA930_BALANCE_${year}_Jan_Jun.csv" "EIA930_BALANCE_${year}_Jul_Dec.csv")
-    wget "$url_jan_jun"
-    wget "$url_jul_dec"
+    curl -O "$url_jan_jun"
+    curl -O "$url_jul_dec"
 done
 
-# Concatenate CSV files
-cat "${csv_files[@]}" > concatenated_data.csv
+# Concatenate CSV files with full paths
+cat "${csv_files[@]/#/$PWD/}" > concatenated_data.csv
 
 # Convert CSV to SQLite
-csvsql --db sqlite:///"$output_db" --insert concatenated_data.csv
+python -m csvkit.utilities.csvsql --db sqlite:///"$output_db" --insert concatenated_data.csv --table test
 
 # Clean up: remove downloaded CSV files and the concatenated file
 rm "${csv_files[@]}" concatenated_data.csv
