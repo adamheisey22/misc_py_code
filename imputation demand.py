@@ -1,59 +1,35 @@
 import pandas as pd
 
-def impute_demand(df, exception_list, demand_range_table):
-    # Convert 'Date' to datetime format
-    df['Date'] = pd.to_datetime(df['Date'])
+def impute_demand_optimized(df, exception_list, threshold_limits):
+    # Merge DataFrame with exception list
+    df = pd.merge(df, exception_list, on='BA', how='left')
 
-    for ba in df['BA'].unique():
-        ba_mask = df['BA'] == ba
+    # Step 1: Check for valid demand forecast value
+    mask_step1 = (df['Forecast'].notnull()) & (df['Exception'].isnull())
+    df.loc[mask_step1, 'ImputedDemand'] = df.loc[mask_step1, 'Forecast']
 
-        # Rule 1: Use demand forecast value if valid and not in the exception list
-        forecast_mask = ~pd.isna(df['Forecast']) | df['BA'].isin(exception_list)
-        df.loc[ba_mask & forecast_mask & pd.isna(df['Demand']), 'Demand'] = df['Forecast']
+    # Step 2: Check for prior hour's demand value
+    mask_step2 = (df['ImputedDemand'].isnull()) & (df['Demand'].shift(1).notnull())
+    df.loc[mask_step2, 'ImputedDemand'] = df.loc[mask_step2, 'Demand'].shift(1)
 
-        # Rule 2: Use prior hour's demand value if valid
-        prior_hour_mask = (df['Hour'] > 1) & pd.isna(df['Demand'])
-        df.loc[ba_mask & prior_hour_mask, 'Demand'] = df['Date'] + pd.to_timedelta(df.loc[ba_mask & prior_hour_mask, 'Hour'] - 1, unit='H')
-        df.loc[ba_mask & prior_hour_mask, 'Demand'] = df.loc[ba_mask & prior_hour_mask].apply(
-            lambda row: df[(df['Date'] == row['Demand']) & (df['Hour'] == row['Hour'] - 1)]['Demand'].values[0] if len(df[(df['Date'] == row['Demand']) & (df['Hour'] == row['Hour'] - 1)]) > 0 else None, axis=1
-        )
+    # Step 3: Check for prior day's demand value
+    mask_step3 = (df['ImputedDemand'].isnull()) & (df['Demand'].shift(24).notnull())
+    df.loc[mask_step3, 'ImputedDemand'] = df.loc[mask_step3, 'Demand'].shift(24)
 
-        # Rule 3: Use corresponding hour from the prior day if valid
-        prior_day_mask = (df['Hour'] == 1) & pd.isna(df['Demand'])
-        df.loc[ba_mask & prior_day_mask, 'Demand'] = df['Date'] + pd.DateOffset(days=-1)
-        df.loc[ba_mask & prior_day_mask, 'Demand'] = df.loc[ba_mask & prior_day_mask].apply(
-            lambda row: df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]['Demand'].values[0] if len(df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]) > 0 else None, axis=1
-        )
+    # Impute a value of 0 for step 3 failure
+    df['ImputedDemand'].fillna(0, inplace=True)
 
-        # Rule 3 failed, impute a value of 0
-        df.loc[ba_mask & pd.isna(df['Demand']), 'Demand'] = 0
+    # Check for reasonable range (threshold limits) using vectorized operations
+    mask_threshold = (
+        (df['ImputedDemand'] >= threshold_limits['lower_threshold']) &
+        (df['ImputedDemand'] <= threshold_limits['upper_threshold'])
+    )
+    df.loc[~mask_threshold, 'ImputedDemand'] = 0
 
-        # Check if demand data is reported but out of reasonable range
-        if ba in demand_range_table:
-            range_mask = (df['Demand'] < demand_range_table[ba]['min']) | (df['Demand'] > demand_range_table[ba]['max'])
+    # Keep only relevant columns in the final DataFrame
+    result_df = df[['BA', 'Hour', 'Demand', 'ImputedDemand']].copy()
 
-            # Rule 1: Use demand forecast value if valid and not in the exception list
-            df.loc[ba_mask & range_mask & forecast_mask, 'Demand'] = df['Forecast']
-
-            # Rule 2: Use prior hour's demand value if valid
-            df.loc[ba_mask & range_mask & prior_hour_mask, 'Demand'] = df['Date'] + pd.to_timedelta(df.loc[ba_mask & range_mask & prior_hour_mask, 'Hour'] - 1, unit='H')
-            df.loc[ba_mask & range_mask & prior_hour_mask, 'Demand'] = df.loc[ba_mask & range_mask & prior_hour_mask].apply(
-                lambda row: df[(df['Date'] == row['Demand']) & (df['Hour'] == row['Hour'] - 1)]['Demand'].values[0] if len(df[(df['Date'] == row['Demand']) & (df['Hour'] == row['Hour'] - 1)]) > 0 else None, axis=1
-            )
-
-            # Rule 3: Use corresponding hour from the prior day if valid
-            df.loc[ba_mask & range_mask & prior_day_mask, 'Demand'] = df['Date'] + pd.DateOffset(days=-1)
-            df.loc[ba_mask & range_mask & prior_day_mask, 'Demand'] = df.loc[ba_mask & range_mask & prior_day_mask].apply(
-                lambda row: df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]['Demand'].values[0] if len(df[(df['Date'] == row['Demand'] + pd.DateOffset(days=1)) & (df['Hour'] == 24)]) > 0 else None, axis=1
-            )
-
-            # Rule 3 failed, impute a value of 0
-            df.loc[ba_mask & range_mask, 'Demand'] = 0
-
-    # Sort the DataFrame by 'Date' and 'Hour'
-    df.sort_values(by=['Date', 'Hour'], inplace=True)
-
-    return df
+    return result_df
 
 # Example usage:
-# df = impute_demand(df, exception_list, demand_range_table)
+# df_imputed = impute_demand_optimized(df, exception_list, threshold_limits)
