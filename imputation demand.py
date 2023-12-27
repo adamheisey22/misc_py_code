@@ -1,35 +1,29 @@
 import pandas as pd
+import numpy as np
 
-def impute_demand_optimized(df, exception_list, threshold_limits):
-    # Merge DataFrame with exception list
-    df = pd.merge(df, exception_list, on='BA', how='left')
+def impute_demand_optimized(df):
+    # Assuming df has columns: 'demand', 'demand_forecast', 'no_forecast', 'lower_threshold', 'upper_threshold'
 
-    # Step 1: Check for valid demand forecast value
-    mask_step1 = (df['Forecast'].notnull()) & (df['Exception'].isnull())
-    df.loc[mask_step1, 'ImputedDemand'] = df.loc[mask_step1, 'Forecast']
+    def valid_demand(value, lower_threshold, upper_threshold):
+        return lower_threshold <= value <= upper_threshold
 
-    # Step 2: Check for prior hour's demand value
-    mask_step2 = (df['ImputedDemand'].isnull()) & (df['Demand'].shift(1).notnull())
-    df.loc[mask_step2, 'ImputedDemand'] = df.loc[mask_step2, 'Demand'].shift(1)
+    # Rule 1: Check if demand is missing or out of range, and demand forecast is available
+    condition_1 = (df['demand'].isnull() | ~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & ~df['no_forecast'] & ~df['demand_forecast'].isnull() & df.apply(lambda x: valid_demand(x['demand_forecast'], x['lower_threshold'], x['upper_threshold']), axis=1)
+    df.loc[condition_1, 'demand'] = df.loc[condition_1, 'demand_forecast']
 
-    # Step 3: Check for prior day's demand value
-    mask_step3 = (df['ImputedDemand'].isnull()) & (df['Demand'].shift(24).notnull())
-    df.loc[mask_step3, 'ImputedDemand'] = df.loc[mask_step3, 'Demand'].shift(24)
+    # Rule 2: Check if demand is still missing or out of range, and prior hour demand is available
+    condition_2 = (df['demand'].isnull() | ~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & ~df['demand'].shift(1).isnull() & df.apply(lambda x: valid_demand(x['demand'].shift(1), x['lower_threshold'], x['upper_threshold']), axis=1)
+    df.loc[condition_2, 'demand'] = df.loc[condition_2, 'demand'].shift(1)
 
-    # Impute a value of 0 for step 3 failure
-    df['ImputedDemand'].fillna(0, inplace=True)
+    # Rule 3: Check if demand is still missing or out of range, and prior day demand is available
+    condition_3 = (df['demand'].isnull() | ~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & ~df['demand'].shift(24).isnull() & df.apply(lambda x: valid_demand(x['demand'].shift(24), x['lower_threshold'], x['upper_threshold']), axis=1)
+    df.loc[condition_3, 'demand'] = df.loc[condition_3, 'demand'].shift(24)
 
-    # Check for reasonable range (threshold limits) using vectorized operations
-    mask_threshold = (
-        (df['ImputedDemand'] >= threshold_limits['lower_threshold']) &
-        (df['ImputedDemand'] <= threshold_limits['upper_threshold'])
-    )
-    df.loc[~mask_threshold, 'ImputedDemand'] = 0
+    # Rule 4: Set to 0 if still missing or out of range
+    df['demand'].fillna(0, inplace=True)
 
-    # Keep only relevant columns in the final DataFrame
-    result_df = df[['BA', 'Hour', 'Demand', 'ImputedDemand']].copy()
-
-    return result_df
+    return df
 
 # Example usage:
-# df_imputed = impute_demand_optimized(df, exception_list, threshold_limits)
+# df = ...  # Your DataFrame with the required columns
+# df_imputed = impute_demand_optimized(df)
