@@ -12,11 +12,11 @@ def impute_demand_optimized(df):
     df.loc[condition_1, 'demand'] = df.loc[condition_1, 'demand_forecast']
 
     # Rule 2: Check if demand is still missing or out of range, and prior hour demand is available
-    condition_2 = (df['demand'].isnull() | ~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & ~df['demand'].shift(1).isnull() & df.apply(lambda x: valid_demand(x['demand'].shift(1), x['lower_threshold'], x['upper_threshold']), axis=1)
+    condition_2 = (df['demand'].isnull() | df.apply(lambda x: not valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & ~df['demand'].shift(1).isnull() & df.apply(lambda x: valid_demand(x['demand'].shift(1), x['lower_threshold'], x['upper_threshold']), axis=1)
     df.loc[condition_2, 'demand'] = df.loc[condition_2, 'demand'].shift(1)
 
     # Rule 3: Check if demand is still missing or out of range, and prior day demand is available
-    condition_3 = (df['demand'].isnull() | ~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & ~df['demand'].shift(24).isnull() & df.apply(lambda x: valid_demand(x['demand'].shift(24), x['lower_threshold'], x['upper_threshold']), axis=1)
+    condition_3 = (df['demand'].isnull() | df.apply(lambda x: not valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & ~df['demand'].shift(24).isnull() & df.apply(lambda x: valid_demand(x['demand'].shift(24), x['lower_threshold'], x['upper_threshold']), axis=1)
     df.loc[condition_3, 'demand'] = df.loc[condition_3, 'demand'].shift(24)
 
     # Rule 4: Set to 0 if still missing or out of range
