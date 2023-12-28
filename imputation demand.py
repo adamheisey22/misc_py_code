@@ -8,7 +8,7 @@ def impute_demand_optimized(df):
         return lower_threshold <= value <= upper_threshold
 
     # Rule 1: Check if demand is missing or out of range, and demand forecast is available
-    condition_1 = (df['demand'].isnull() | (~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1))) & (~(df['no_forecast']) & ~(df['demand_forecast'].isnull()) & df.apply(lambda x: valid_demand(x['demand_forecast'], x['lower_threshold'], x['upper_threshold']), axis=1))
+    condition_1 = (df['demand'].isnull() | (~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1))) & (~(df['no_forecast']).astype(bool) & ~(df['demand_forecast'].isnull()) & df.apply(lambda x: valid_demand(x['demand_forecast'], x['lower_threshold'], x['upper_threshold']), axis=1))
     df.loc[condition_1, 'demand'] = df.loc[condition_1, 'demand_forecast']
 
     # Rule 2: Check if demand is still missing or out of range, and prior hour demand is available
