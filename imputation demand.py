@@ -7,6 +7,9 @@ def impute_demand_optimized(df):
     def valid_demand(value, lower_threshold, upper_threshold):
         return lower_threshold <= value <= upper_threshold
 
+    # Convert relevant columns to numeric
+    df[['demand', 'demand_forecast', 'lower_threshold', 'upper_threshold']] = df[['demand', 'demand_forecast', 'lower_threshold', 'upper_threshold']].apply(pd.to_numeric, errors='coerce')
+
     # Rule 1: Check if demand is missing or out of range, and demand forecast is available
     condition_1 = (df['demand'].isnull() | ~df.apply(lambda x: valid_demand(x['demand'], x['lower_threshold'], x['upper_threshold']), axis=1)) & (df['no_forecast'] != True) & ~(df['demand_forecast'].isnull()) & df.apply(lambda x: valid_demand(x['demand_forecast'], x['lower_threshold'], x['upper_threshold']), axis=1)
     df.loc[condition_1, 'demand'] = df.loc[condition_1, 'demand_forecast']
