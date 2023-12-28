@@ -22,9 +22,22 @@ def download_and_concatenate_weather_data(stations, output_database='weather_dat
             # Add station ID as a column
             data['station_id'] = station_id
 
-            # Concatenate the data to the SQLite database
-            data.to_sql('weather_data', conn, if_exists='append', index=False)
+            # Get the existing columns in the database
+            cursor = conn.cursor()
+            cursor.execute(f"PRAGMA table_info(weather_data);")
+            existing_columns = [column_info[1] for column_info in cursor.fetchall()]
 
+            # Identify new columns
+            new_columns = list(set(data.columns) - set(existing_columns))
+
+            # If there are new columns, add them to the SQLite table
+            if new_columns:
+                for new_column in new_columns:
+                    cursor.execute(f"ALTER TABLE weather_data ADD COLUMN {new_column} TEXT;")
+                conn.commit()
+
+            # Append the data to the SQLite database
+            data.to_sql('weather_data', conn, if_exists='append', index=False)
             print(f'Downloaded and added data for station {station_id}')
         else:
             print(f'Data file not found for station {station_id}')
