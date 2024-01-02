@@ -3,6 +3,7 @@ import tarfile
 import sqlite3
 import pandas as pd
 from io import BytesIO
+from tqdm import tqdm
 
 # Define the URL pattern and years
 base_url = "https://www.ncei.noaa.gov/data/global-hourly/archive/csv/"
@@ -14,12 +15,9 @@ conn = sqlite3.connect(db_file)
 
 # Function to process and load a single CSV file into the database
 def process_csv(file_stream):
-    chunksize = 10 ** 5  # Adjusted for lower memory usage
-    try:
-        for chunk in pd.read_csv(file_stream, chunksize=chunksize, low_memory=False):
-            chunk.to_sql('noaa_data', conn, if_exists='append', index=False)
-    except pd.errors.EmptyDataError:
-        print("Warning: Encountered an empty CSV file.")
+    chunksize = 10 ** 5
+    for chunk in tqdm(pd.read_csv(file_stream, chunksize=chunksize, low_memory=False), desc="Processing CSV", leave=False):
+        chunk.to_sql('noaa_data', conn, if_exists='append', index=False)
 
 # Download, stream, and process each year's data
 for year in years:
@@ -27,16 +25,23 @@ for year in years:
     print(f"Processing data for year {year}...")
 
     try:
-        response = requests.get(file_url, stream=True)
-        response.raise_for_status()  # Check if the request was successful
+        with requests.get(file_url, stream=True) as response:
+            response.raise_for_status()  # Check if the request was successful
+            total_size_in_bytes = int(response.headers.get('content-length', 0))
+            block_size = 1024  # 1 Kibibyte
 
-        file_stream = BytesIO(response.content)
+            file_stream = BytesIO()
+            with tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True, desc=f"Downloading {year}") as progress_bar:
+                for data in response.iter_content(block_size):
+                    progress_bar.update(len(data))
+                    file_stream.write(data)
 
-        with tarfile.open(fileobj=file_stream, mode="r:gz") as tar:
-            for member in tar.getmembers():
-                if member.isfile() and member.name.endswith('.csv'):
-                    csv_file = tar.extractfile(member)
-                    process_csv(csv_file)
+            file_stream.seek(0)
+            with tarfile.open(fileobj=file_stream, mode="r:gz") as tar:
+                for member in tar.getmembers():
+                    if member.isfile() and member.name.endswith('.csv'):
+                        csv_file = tar.extractfile(member)
+                        process_csv(csv_file)
     except requests.RequestException as e:
         print(f"Error downloading data for year {year}: {e}")
 
