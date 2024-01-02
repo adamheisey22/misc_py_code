@@ -1,50 +1,45 @@
-import os
 import requests
-import pandas as pd
+import tarfile
 import sqlite3
+import pandas as pd
+from io import BytesIO
 
-def download_and_concatenate_weather_data(stations, output_database='weather_data.db'):
-    base_url = 'https://www.ncei.noaa.gov/data/global-hourly/access/2019/'
+# Define the URL pattern and years
+base_url = "https://www.ncei.noaa.gov/data/global-hourly/archive/csv/"
+years = range(2019, 2024)
 
-    # Create SQLite database connection
-    conn = sqlite3.connect(output_database)
+# SQLite database setup
+db_file = 'noaa_data.db'
+conn = sqlite3.connect(db_file)
 
-    for station_id in stations:
-        data_file_name = f'{station_id}_2019.csv'
-        data_file_url = f'{base_url}{data_file_name}'
+# Function to process and load a single CSV file into the database
+def process_csv(file_stream):
+    chunksize = 10 ** 5  # Adjusted for lower memory usage
+    try:
+        for chunk in pd.read_csv(file_stream, chunksize=chunksize, low_memory=False):
+            chunk.to_sql('noaa_data', conn, if_exists='append', index=False)
+    except pd.errors.EmptyDataError:
+        print("Warning: Encountered an empty CSV file.")
 
-        # Check if the data file exists
-        response = requests.head(data_file_url)
-        if response.status_code == 200:
-            # Download the data
-            data = pd.read_csv(data_file_url)
+# Download, stream, and process each year's data
+for year in years:
+    file_url = f"{base_url}{year}.tar.gz"
+    print(f"Processing data for year {year}...")
 
-            # Add station ID as a column
-            data['station_id'] = station_id
+    try:
+        response = requests.get(file_url, stream=True)
+        response.raise_for_status()  # Check if the request was successful
 
-            # Get the existing columns in the database
-            cursor = conn.cursor()
-            cursor.execute(f"PRAGMA table_info(weather_data);")
-            existing_columns = [column_info[1] for column_info in cursor.fetchall()]
+        file_stream = BytesIO(response.content)
 
-            # Identify new columns
-            new_columns = list(set(data.columns) - set(existing_columns))
+        with tarfile.open(fileobj=file_stream, mode="r:gz") as tar:
+            for member in tar.getmembers():
+                if member.isfile() and member.name.endswith('.csv'):
+                    csv_file = tar.extractfile(member)
+                    process_csv(csv_file)
+    except requests.RequestException as e:
+        print(f"Error downloading data for year {year}: {e}")
 
-            # If there are new columns, add them to the SQLite table
-            if new_columns:
-                for new_column in new_columns:
-                    cursor.execute(f"ALTER TABLE weather_data ADD COLUMN {new_column} TEXT;")
-                conn.commit()
-
-            # Append the data to the SQLite database
-            data.to_sql('weather_data', conn, if_exists='append', index=False)
-            print(f'Downloaded and added data for station {station_id}')
-        else:
-            print(f'Data file not found for station {station_id}')
-
-    # Close the database connection
-    conn.close()
-
-# Example usage:
-station_ids = [1, 2, 3]  # Replace with your actual station IDs
-download_and_concatenate_weather_data(station_ids)
+# Close database connection
+conn.close()
+print("Data import complete.")
