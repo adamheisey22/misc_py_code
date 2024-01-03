@@ -15,18 +15,40 @@ def read_station_ids_by_year(file_path):
                 station_ids_by_year[int(year)] = [s.strip() for s in station_ids.split(",")]
     return station_ids_by_year
 
+def initialize_database(conn, table_name):
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            id INTEGER PRIMARY KEY,
+            year INTEGER,
+            station_id TEXT
+        )
+    """)
+    conn.commit()
+
 def update_table_schema(conn, table_name, new_columns):
     existing_cols = pd.read_sql(f"PRAGMA table_info({table_name})", conn)['name']
     for col in new_columns:
         if col not in existing_cols.to_list():
             conn.execute(f"ALTER TABLE {table_name} ADD COLUMN [{col}]")
+    conn.commit()
+
+def check_if_data_exists(conn, table_name, year, station_id):
+    query = f"SELECT COUNT(*) FROM {table_name} WHERE year = ? AND station_id = ?"
+    cur = conn.cursor()
+    cur.execute(query, (year, station_id))
+    return cur.fetchone()[0] > 0
 
 def download_and_process_data(year, station_id, conn, table_name, chunksize=10000):
+    if check_if_data_exists(conn, table_name, year, station_id):
+        return  # Skip if data already exists
+
     url = f"https://www.ncei.noaa.gov/data/global-hourly/access/{year}/{station_id}.csv"
     response = requests.get(url, stream=True)
     if response.status_code == 200:
         first_chunk = True
         for chunk in pd.read_csv(StringIO(response.text), chunksize=chunksize):
+            chunk['year'] = year  # Add year column
+            chunk['station_id'] = station_id  # Add station_id column
             if first_chunk:
                 update_table_schema(conn, table_name, chunk.columns)
                 first_chunk = False
@@ -41,7 +63,7 @@ def process_station_id_for_year(year, station_ids, table_name="noaa_hourly_data"
 
 def process_all_stations(station_ids_by_year, table_name="noaa_hourly_data"):
     with sqlite3.connect("noaa_data.db") as conn:
-        conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} (id INTEGER PRIMARY KEY)")
+        initialize_database(conn, table_name)
     threads = []
     for year, station_ids in station_ids_by_year.items():
         thread = threading.Thread(target=process_station_id_for_year, args=(year, station_ids, table_name))
