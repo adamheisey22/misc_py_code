@@ -1,49 +1,56 @@
+import datetime
+from time import time
+import requests
 import pandas as pd
 import sqlite3
-import requests
-from io import BytesIO
+import threading
+from io import StringIO
 from tqdm import tqdm
-import tarfile
 
-def create_table_from_df(df, conn, table_name):
-    columns = ', '.join([f"{col} TEXT" for col in df.columns])
-    create_query = f"CREATE TABLE IF NOT EXISTS {table_name} ({columns});"
-    conn.execute(create_query)
+def read_station_ids(file_path):
+    with open(file_path, 'r') as file:
+        return [line.strip() for line in file if line.strip()]
 
-# Define the URL pattern and years
-base_url = "https://www.ncei.noaa.gov/data/global-hourly/archive/csv/"
-years = range(2019, 2024)
-db_file = 'noaa_data.db'
+def update_table_schema(conn, table_name, new_columns):
+    existing_cols = pd.read_sql(f"PRAGMA table_info({table_name})", conn)['name']
+    for col in new_columns:
+        if col not in existing_cols.to_list():
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN [{col}]")
 
-with sqlite3.connect(db_file) as conn:
-    for year in years:
-        file_url = f"{base_url}{year}.tar.gz"
-        print(f"Processing data for year {year}...")
+def download_and_process_data(year, station_id, conn, table_name, chunksize=10000):
+    url = f"https://www.ncei.noaa.gov/data/global-hourly/access/{year}/{station_id}.csv"
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        first_chunk = True
+        for chunk in pd.read_csv(StringIO(response.text), chunksize=chunksize):
+            if first_chunk:
+                update_table_schema(conn, table_name, chunk.columns)
+                first_chunk = False
+            chunk.to_sql(name=table_name, con=conn, if_exists='append', index=False)
 
-        try:
-            response = requests.get(file_url, stream=True)
-            response.raise_for_status()
-            total_size_in_bytes = int(response.headers.get('content-length', 0))
-            block_size = 1024
+def process_station_id(station_id, start_year=2019, end_year=2023, table_name="noaa_hourly_data"):
+    with sqlite3.connect("noaa_data.db") as conn:
+        for year in tqdm(range(start_year, end_year + 1), desc=f"Processing {station_id}"):
+            download_and_process_data(year, station_id, conn, table_name)
 
-            file_stream = BytesIO()
-            with tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True, desc=f"Downloading {year}", leave=False) as progress_bar:
-                for data in response.iter_content(block_size):
-                    progress_bar.update(len(data))
-                    file_stream.write(data)
+def process_all_stations(station_ids, table_name="noaa_hourly_data"):
+    with sqlite3.connect("noaa_data.db") as conn:
+        conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} (id INTEGER PRIMARY KEY)")
+    threads = []
+    for station_id in station_ids:
+        thread = threading.Thread(target=process_station_id, args=(station_id, 2019, 2023, table_name))
+        threads.append(thread)
+        thread.start()
 
-            file_stream.seek(0)
-            with tarfile.open(fileobj=file_stream, mode="r:gz") as tar:
-                for member in tqdm(tar.getmembers(), desc="Extracting files", leave=False):
-                    if member.isfile() and member.name.endswith('.csv'):
-                        csv_file = tar.extractfile(member)
-                        df = pd.read_csv(csv_file, low_memory=False)
-                        create_table_from_df(df, conn, 'noaa_data')
-                        for chunk in tqdm(pd.read_csv(csv_file, chunksize=10**5), desc="Processing CSV", leave=False):
-                            chunk.to_sql('noaa_data', conn, if_exists='append', index=False)
-        except requests.RequestException as e:
-            print(f"Error downloading data for year {year}: {e}")
-        except Exception as e:
-            print(f"An unexpected error occurred while processing data for year {year}: {e}")
+    for thread in threads:
+        thread.join()
 
-print("Data import complete.")
+t0 = time()
+
+# Example usage
+station_ids = read_station_ids("stations.txt")
+process_all_stations(station_ids)
+
+t1 = time()
+
+print(str(datetime.timedelta(seconds=round(t1-t0))))
