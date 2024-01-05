@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def fill_demand_ba(df):
+def fill_demand_ba(df, df_threshold):
     # Convert relevant columns to numeric
     cols_to_convert = ['Demand', 'demand_forecast']
     df[cols_to_convert] = df[cols_to_convert].apply(pd.to_numeric, errors='coerce')
@@ -10,11 +10,16 @@ def fill_demand_ba(df):
     df['Date'] = pd.to_datetime(df['Date'])
     df.sort_values(by=['BA', 'Date', 'Hour'], inplace=True)
 
-    # Compute thresholds for each BA
+    # Merge predefined thresholds
+    df = df.merge(df_threshold[['BA', 'Lower_Threshold', 'Upper_Threshold']], on='BA', how='left')
+
+    # Calculate thresholds using 3 standard deviations for BAs without predefined thresholds
     thresholds = df.groupby('BA')['Demand'].agg(['mean', 'std']).reset_index()
-    thresholds['Lower_Threshold'] = 0
-    thresholds['Upper_Threshold'] = thresholds['mean'] + 3 * thresholds['std']
-    df = df.merge(thresholds[['BA', 'Lower_Threshold', 'Upper_Threshold']], on='BA', how='left')
+    thresholds['Calculated_Upper_Threshold'] = thresholds['mean'] + 3 * thresholds['std']
+
+    df = df.merge(thresholds[['BA', 'Calculated_Upper_Threshold']], on='BA', how='left')
+    df['Upper_Threshold'].fillna(df['Calculated_Upper_Threshold'], inplace=True)
+    df['Lower_Threshold'].fillna(0, inplace=True)  # Lower threshold set to 0
 
     # Read exception lookup table for BAs
     df_exception = pd.read_csv('ba_no_forec_lkup_table.csv')
@@ -39,5 +44,6 @@ def fill_demand_ba(df):
 
     return df
 
+# Assuming df_threshold is the DataFrame with predefined thresholds
 # Apply the function
-df_imp = fill_demand_ba(df_out)
+df_imp = fill_demand_ba(df_out, df_threshold)
