@@ -3,12 +3,18 @@ import numpy as np
 
 def fill_demand_ba(df):
     # Convert relevant columns to numeric
-    cols_to_convert = ['Demand', 'demand_forecast', 'Lower_Threshold', 'Upper_Threshold']
+    cols_to_convert = ['Demand', 'demand_forecast']
     df[cols_to_convert] = df[cols_to_convert].apply(pd.to_numeric, errors='coerce')
 
     # Convert 'Date' to datetime format and sort
     df['Date'] = pd.to_datetime(df['Date'])
     df.sort_values(by=['BA', 'Date', 'Hour'], inplace=True)
+
+    # Compute thresholds for each BA
+    thresholds = df.groupby('BA')['Demand'].agg(['mean', 'std']).reset_index()
+    thresholds['Lower_Threshold'] = 0
+    thresholds['Upper_Threshold'] = thresholds['mean'] + 3 * thresholds['std']
+    df = df.merge(thresholds[['BA', 'Lower_Threshold', 'Upper_Threshold']], on='BA', how='left')
 
     # Read exception lookup table for BAs
     df_exception = pd.read_csv('ba_no_forec_lkup_table.csv')
