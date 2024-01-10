@@ -35,6 +35,12 @@ def update_table_structure(engine, table, dataframe):
 
 def data_exists(engine, table_name, year, date_column):
     meta = MetaData()
+    
+    # Check if the table exists
+    if not inspect(engine).has_table(table_name):
+        print(f"Table '{table_name}' does not exist in the database.")
+        return False
+
     table = Table(table_name, meta, autoload_with=engine)
 
     if date_column not in table.c:
