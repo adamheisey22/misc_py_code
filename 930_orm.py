@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine, MetaData, Table, Column, String, select, func, inspect
 from sqlalchemy.exc import NoSuchTableError
-# import support_functions
+import support_functions
 from time import time
 import datetime
 
@@ -11,7 +11,7 @@ def create_engine_with_db(database_url):
 def get_or_create_table(engine, table_name, dataframe):
     meta = MetaData()
     inspector = inspect(engine)
-
+    
     if not inspector.has_table(table_name):
         # Create table if it doesn't exist
         columns = [Column(name, String) for name in dataframe.columns]
@@ -19,12 +19,12 @@ def get_or_create_table(engine, table_name, dataframe):
         meta.create_all(engine)
     else:
         table = Table(table_name, meta, autoload_with=engine)
-
+    
     return table
 
 def update_table_structure(engine, table, dataframe):
-    meta = MetaData()
-    meta.reflect(bind=engine)
+    meta = MetaData(bind=engine)
+    meta.reflect()
     existing_columns = set(table.columns.keys())
     new_columns = set(dataframe.columns) - existing_columns
 
@@ -35,13 +35,13 @@ def update_table_structure(engine, table, dataframe):
             conn.execute(f'ALTER TABLE {table.name} ADD COLUMN {quoted_column} STRING')
 
 def data_exists(engine, table_name, year, date_column):
-    meta = MetaData(engine)
+    meta = MetaData(bind=engine)
     table = Table(table_name, meta, autoload=True)
 
     if date_column not in table.c:
         print(f"Column '{date_column}' not found in the table '{table_name}'.")
         return False
-
+    
     query = select([func.count()]).select_from(table).where(table.c[date_column].like(f'%{year}%'))
     result = engine.execute(query).scalar()
     return result > 0
@@ -72,11 +72,11 @@ def process_and_load_data(years, url_template, table_name, engine, date_column):
                 print(f"Failed to download or parse data from {url}")
 
 def main():
-    # log_file = support_functions.log_output("outputs/download_logs/eia930/")
+    log_file = support_functions.log_output("outputs/download_logs/eia930/")
     try:
         t0 = time()
 
-        database_url = 'sqlite:///C:/Users/adamh/OneDrive - Marquette University/Personal/Jobs/Health Catalyst/EIA930_database.db'
+        database_url = 'sqlite:///N:/NextGen Developers/Projects/demand_profiles/EIA930_database.db'
         engine = create_engine_with_db(database_url)
 
         years = [2018, 2019, 2020, 2021, 2022, 2023]
@@ -90,8 +90,7 @@ def main():
         print(str(datetime.timedelta(seconds=round(t1 - t0))))
 
     finally:
-        print('dn')
-        # log_file.close()
+        log_file.close()
 
 if __name__ == "__main__":
     main()
