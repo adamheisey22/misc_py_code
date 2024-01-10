@@ -9,19 +9,21 @@ def create_engine_with_db(database_url):
     return create_engine(database_url)
 
 def get_or_create_table(engine, table_name, dataframe):
-    meta = MetaData(engine)
+    meta = MetaData()
     
     if not inspect(engine).has_table(table_name):
         # Create table if it doesn't exist
         columns = [Column(name, String) for name in dataframe.columns]
         table = Table(table_name, meta, *columns)
-        meta.create_all()
+        meta.create_all(engine)
     else:
-        table = Table(table_name, meta, autoload=True, autoload_with=engine)
+        table = Table(table_name, meta, autoload_with=engine)
     
     return table
 
 def update_table_structure(engine, table, dataframe):
+    meta = MetaData()
+    meta.reflect(bind=engine)
     existing_columns = set(table.columns.keys())
     new_columns = set(dataframe.columns) - existing_columns
 
@@ -33,7 +35,7 @@ def update_table_structure(engine, table, dataframe):
 
 def data_exists(engine, table_name, year, date_column):
     meta = MetaData()
-    table = Table(table_name, meta, autoload=True, autoload_with=engine)
+    table = Table(table_name, meta, autoload_with=engine)
 
     if date_column not in table.c:
         print(f"Column '{date_column}' not found in the table '{table_name}'.")
