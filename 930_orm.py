@@ -1,5 +1,6 @@
 import pandas as pd
-from sqlalchemy import create_engine, MetaData, Table, Column, String, inspect
+from sqlalchemy import create_engine, MetaData, Table, Column, String, select, func, inspect
+from sqlalchemy.exc import NoSuchTableError
 import support_functions
 from time import time
 import datetime
@@ -21,8 +22,8 @@ def get_or_create_table(engine, table_name, dataframe):
     return table
 
 def update_table_structure(engine, table, dataframe):
-    meta = MetaData(bind=engine)
-    meta.reflect()
+    meta = MetaData()
+    meta.reflect(bind=engine)
     existing_columns = set(table.columns.keys())
     new_columns = set(dataframe.columns) - existing_columns
 
@@ -34,7 +35,8 @@ def update_table_structure(engine, table, dataframe):
 
 def data_exists(engine, table_name, year, date_column):
     meta = MetaData()
-
+    
+    # Check if the table exists
     if not inspect(engine).has_table(table_name):
         print(f"Table '{table_name}' does not exist in the database.")
         return False
@@ -45,7 +47,7 @@ def data_exists(engine, table_name, year, date_column):
         print(f"Column '{date_column}' not found in the table '{table_name}'.")
         return False
     
-    query = f"SELECT COUNT(*) FROM {table_name} WHERE {date_column} LIKE '%{year}%'"
+    query = select([func.count()]).select_from(table).where(table.c[date_column].like(f'%{year}%'))
     result = engine.execute(query).scalar()
     return result > 0
 
