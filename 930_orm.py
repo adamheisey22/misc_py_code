@@ -1,99 +1,115 @@
 import pandas as pd
-from sqlalchemy import create_engine, MetaData, Table, Column, String, inspect
+from sqlalchemy import create_engine, Column, String, DateTime, MetaData
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, scoped_session
 import support_functions
 from time import time
 import datetime
+import requests
 
-def create_engine_with_db(database_url):
-    return create_engine(database_url)
+# Define the base class for ORM
+Base = declarative_base()
 
-def get_or_create_table(engine, table_name, dataframe):
-    meta = MetaData()
-    
-    if not inspect(engine).has_table(table_name):
-        # Create table if it doesn't exist
-        columns = [Column(name, String) for name in dataframe.columns]
-        table = Table(table_name, meta, *columns)
-        meta.create_all(engine)
-    else:
-        table = Table(table_name, meta, autoload_with=engine)
-    
-    return table
+# ORM class definitions as before
+class EIA930Balance(Base):
+    __tablename__ = 'eia930_balance_raw'
+    id = Column(String, primary_key=True)
+    balancing_authority = Column(String)
+    utc_time_at_end_of_hour = Column(DateTime)
+    # Add other columns as needed
 
-def update_table_structure(engine, table, dataframe):
-    meta = MetaData()
-    meta.reflect(bind=engine)
-    existing_columns = set(table.columns.keys())
-    new_columns = set(dataframe.columns) - existing_columns
+class EIA930Subregion(Base):
+    __tablename__ = 'eia930_subregion_raw'
+    id = Column(String, primary_key=True)
+    subregion = Column(String)
+    utc_time_at_end_of_hour = Column(DateTime)
+    # Add other columns as needed
 
-    with engine.connect() as conn:
-        for column in new_columns:
-            # SQLite requires columns to be quoted if they contain special characters or spaces
-            quoted_column = f'"{column}"' if ' ' in column or any(c in column for c in '()[]{}<>-+=*%&^$#@!~') else column
-            conn.execute(f'ALTER TABLE {table.name} ADD COLUMN {quoted_column} STRING')
+def create_database(engine):
+    Base.metadata.create_all(engine)
 
-def data_exists(engine, table_name, year, date_column):
-    meta = MetaData()
+def convert_to_datetime(df, column_name):
+    """
+    Convert a DataFrame column to datetime objects.
+    """
+    df[column_name] = pd.to_datetime(df[column_name])
+    return df
 
-    if not inspect(engine).has_table(table_name):
-        print(f"Table '{table_name}' does not exist in the database.")
-        return False
+def check_data_exists(session, model, year):
+    """
+    Check if data for the specific year exists in the table.
+    """
+    return session.query(model).filter(model.utc_time_at_end_of_hour.between(f'{year}-01-01', f'{year}-12-31')).first() is not None
 
-    table = Table(table_name, meta, autoload_with=engine)
-
-    if date_column not in table.c:
-        print(f"Column '{date_column}' not found in the table '{table_name}'.")
-        return False
-    
-    query = f"SELECT COUNT(*) FROM {table_name} WHERE {date_column} LIKE '%{year}%'"
-    result = engine.execute(query).scalar()
-    return result > 0
-
-def download_data(url):
-    try:
-        dataframe = pd.read_csv(url, low_memory=False, on_bad_lines='skip')
-        print(f"Columns in {url}: {dataframe.columns.tolist()}")
-        return dataframe
-    except pd.errors.ParserError as e:
-        print(f"Parser error while reading {url}: {e}")
-        return None
-
-def process_and_load_data(years, url_template, table_name, engine, date_column):
+def EIA930_BA_download(years, session):
     for year in years:
-        for half in ['Jan_Jun', 'Jul_Dec']:
-            url = url_template.format(year=year, half=half)
-            dataframe = download_data(url)
+        if check_data_exists(session, EIA930Balance, year):
+            print(f"Data for year {year} already exists in EIA930 Balance. Skipping download.")
+            continue
+        
+        urls = [
+            f'https://www.eia.gov/electricity/gridmonitor/sixMonthFiles/EIA930_BALANCE_{year}_Jul_Dec.csv',
+            f'https://www.eia.gov/electricity/gridmonitor/sixMonthFiles/EIA930_BALANCE_{year}_Jan_Jun.csv'
+        ]
 
-            if dataframe is not None:
-                table = get_or_create_table(engine, table_name, dataframe)
-                update_table_structure(engine, table, dataframe)
+        for url in urls:
+            try:
+                df = pd.read_csv(url, low_memory=False)
+                df = convert_to_datetime(df, 'UTC Time at End of Hour')
+                df['id'] = df['Balancing Authority'] + '_' + df['UTC Time at End of Hour'].astype(str)
 
-                if not data_exists(engine, table_name, year, date_column):
-                    dataframe.to_sql(table_name, con=engine, index=False, if_exists='append')
-                    print(f'Data from {url} loaded into {table_name}.')
-            else:
-                print(f"Failed to download or parse data from {url}")
+                # Bulk insert to optimize performance
+                session.bulk_insert_mappings(EIA930Balance, df.to_dict(orient='records'))
+                session.commit()
+            except Exception as e:
+                print(f"Error downloading or processing data for year {year} from {url}: {e}")
+                session.rollback()
+
+def EIA930_SUB_download(years, session):
+    for year in years:
+        if check_data_exists(session, EIA930Subregion, year):
+            print(f"Data for year {year} already exists in EIA930 Subregion. Skipping download.")
+            continue
+        
+        urls = [
+            f'https://www.eia.gov/electricity/gridmonitor/sixMonthFiles/EIA930_SUBREGION_{year}_Jul_Dec.csv',
+            f'https://www.eia.gov/electricity/gridmonitor/sixMonthFiles/EIA930_SUBREGION_{year}_Jan_Jun.csv'
+        ]
+
+        for url in urls:
+            try:
+                df = pd.read_csv(url, low_memory=False)
+                df = convert_to_datetime(df, 'UTC Time at End of Hour')
+                df['id'] = df['Subregion'] + '_' + df['UTC Time at End of Hour'].astype(str)
+
+                # Bulk insert to optimize performance
+                session.bulk_insert_mappings(EIA930Subregion, df.to_dict(orient='records'))
+                session.commit()
+            except Exception as e:
+                print(f"Error downloading or processing data for year {year} from {url}: {e}")
+                session.rollback()
 
 def main():
-    log_file = support_functions.log_output("outputs/download_logs/eia930/")
-    try:
-        t0 = time()
+    engine = create_engine('sqlite:///N:/NextGen Developers/Projects/demand_profiles/EIA930_database.db')
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-        database_url = 'sqlite:///N:/NextGen Developers/Projects/demand_profiles/EIA930_database.db'
-        engine = create_engine_with_db(database_url)
+    create_database(engine)
 
-        years = [2018, 2019, 2020, 2021, 2022, 2023]
-        url_template_balance = 'https://www.eia.gov/electricity/gridmonitor/sixMonthFiles/EIA930_BALANCE_{year}_{half}.csv'
-        url_template_subregion = 'https://www.eia.gov/electricity/gridmonitor/sixMonthFiles/EIA930_SUBREGION_{year}_{half}.csv'
+    t0 = time()
 
-        process_and_load_data(years, url_template_balance, 'eia930_balance_raw', engine, 'Data Date')
-        process_and_load_data(years, url_template_subregion, 'eia930_subregion_raw', engine, 'Data Date')
+    # Define years for each function
+    ba_years = [2018, 2019, 2020]
+    subregion_years = [2021, 2022, 2023]
 
-        t1 = time()
-        print(str(datetime.timedelta(seconds=round(t1 - t0))))
+    # Perform downloads for each function with its respective years
+    EIA930_BA_download(ba_years, session)
+    EIA930_SUB_download(subregion_years, session)
 
-    finally:
-        log_file.close()
+    t1 = time()
+    print(str(datetime.timedelta(seconds=round(t1 - t0))))
+
+    session.close()
 
 if __name__ == "__main__":
     main()
