@@ -1,4 +1,4 @@
-{{! Custom Docstring Template combining NumPy and Sphinx styles }}
+{{! Combined NumPy and Sphinx Docstring Template }}
 {{summaryPlaceholder}}
 
 {{extendedSummaryPlaceholder}}
@@ -8,11 +8,11 @@ Parameters
 ----------
 {{#args}}
 {{var}} : {{typePlaceholder}}
-    {{descriptionPlaceholder}}
+    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
 {{/args}}
 {{#kwargs}}
 {{var}} : {{typePlaceholder}}, optional
-    {{descriptionPlaceholder}}. Defaults to {{&default}}.
+    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}. Defaults to {{&default}}.
 {{/kwargs}}
 {{/parametersExist}}
 {{#exceptionsExist}}
@@ -20,8 +20,8 @@ Parameters
 Raises
 ------
 {{#exceptions}}
-{{type}} : 
-    {{descriptionPlaceholder}}
+{{type}} 
+    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
 {{/exceptions}}
 {{/exceptionsExist}}
 {{#returnsExist}}
@@ -29,8 +29,8 @@ Raises
 Returns
 -------
 {{#returns}}
-{{typePlaceholder}} 
-    {{descriptionPlaceholder}}
+{{typePlaceholder}}
+    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
 {{/returns}}
 {{/returnsExist}}
 {{#yieldsExist}}
@@ -38,7 +38,7 @@ Returns
 Yields
 ------
 {{#yields}}
-{{typePlaceholder}} 
-    {{descriptionPlaceholder}}
+{{typePlaceholder}}
+    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
 {{/yields}}
 {{/yieldsExist}}
