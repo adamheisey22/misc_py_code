@@ -1,150 +1,92 @@
-Adapting your guide to use the NumPy docstring style for Sphinx documentation can enhance clarity and consistency, especially for projects involving scientific computing or that heavily rely on NumPy. NumPy-style docstrings are well-suited for documenting APIs and are widely used in the scientific Python community. Here's how you can adjust your guide:
+Certainly! Let's expand on the guide by including the general structure and examples for writing Python docstrings in both NumPy and PEP 257 styles, along with integrating them with Sphinx.
 
-# Sphinx-friendly Python Coding Guidelines with NumPy Style
+### 4. Writing Docstrings: PEP 257 Style
 
-## Introduction
+#### General Structure
+- **One-liner Docstrings**: For very simple functions.
+  ```python
+  def add(a, b):
+      """Add two numbers and return the result."""
+      return a + b
+  ```
+- **Multi-line Docstrings**: For more complex functions, including a summary line, a detailed description, parameters, return type, and any other important information.
+  ```python
+  def multiply(a, b):
+      """
+      Multiply two numbers and return the result.
 
-This guide is tailored for writing Python code and docstrings in a NumPy style that is compatible with Sphinx, aiming to facilitate automated documentation generation. Adopting the NumPy docstring convention will help in maintaining code readability and consistency across our documentation.
+      This function takes two numbers, multiplies them,
+      and returns the result. It does not handle non-numeric types.
 
-## Writing Docstrings
+      Args:
+          a (int): The first number.
+          b (int): The second number.
 
-### General Structure
+      Returns:
+          int: The product of a and b.
+      """
+      return a * b
+  ```
 
-Docstrings should be enclosed in triple double quotes. The first line is a short description of the function's purpose. More detailed information follows after a blank line.
+### 5. Writing Docstrings: NumPy Style
 
-```python
-def function_name(param1, param2):
-    """
-    Summary line.
+#### General Structure
+- **Sections**: Common sections include Summary, Parameters, Returns, Examples, and Notes.
+  ```python
+  def divide(a, b):
+      """
+      Divide a by b and return the result.
 
-    Extended description, if necessary.
+      Parameters
+      ----------
+      a : float
+          Numerator.
+      b : float
+          Denominator; must not be zero.
 
-    Parameters
-    ----------
-    param1 : type
-        Description of param1.
-    param2 : type
-        Description of param2.
+      Returns
+      -------
+      float
+          The result of division.
 
-    Returns
-    -------
-    type
-        Description of the return value.
-    """
-```
+      Raises
+      ------
+      ValueError
+          If b is zero.
 
-### Documenting Functions
+      Examples
+      --------
+      >>> divide(10, 2)
+      5.0
 
-Document functions by including sections for the summary, parameters, returns, and other relevant information.
+      >>> divide(5, 0)
+      ValueError: Denominator must not be zero.
+      """
+      if b == 0:
+          raise ValueError("Denominator must not be zero.")
+      return a / b
+  ```
 
-```python
-def add(a, b):
-    """
-    Add two numbers together.
+### 6. Integrating Docstrings with Sphinx
 
-    Parameters
-    ----------
-    a : int or float
-        First number.
-    b : int or float
-        Second number.
+- **Autodoc**: Use the autodoc extension to generate documentation from docstrings.
+  - In `conf.py`, include `'sphinx.ext.autodoc'` in the `extensions` list.
+  - Use directives like `.. automodule::`, `.. autofunction::`, or `.. autoclass::` in your `.rst` files to include documentation from your modules, functions, or classes.
 
-    Returns
-    -------
-    int or float
-        Sum of `a` and `b`.
-    """
-    return a + b
-```
+- **Example**: To document the `multiply` function in your Sphinx documentation, you could write in an `.rst` file:
+  ```
+  .. autofunction:: mymodule.multiply
+  ```
 
-### Documenting Classes
+### 7. Generating Documentation
 
-When documenting classes, describe the purpose of the class and include documentation for methods and attributes using the same structure as for functions.
+- **Building Docs**: Run `make html` in the command line from your documentation directory to generate HTML documentation.
+- **Output**: Check the `build/html` directory for the generated documentation.
 
-```python
-class Calculator:
-    """
-    A simple calculator class for basic operations.
+### Best Practices
 
-    Methods
-    -------
-    add(a, b)
-        Add two numbers together.
+- **Keep Docstrings Updated**: Always update docstrings when the code changes.
+- **Clear and Concise**: Write clear, concise, and helpful descriptions.
+- **Consistency**: Use a consistent style throughout the project.
 
-    Examples
-    --------
-    >>> calc = Calculator()
-    >>> calc.add(4, 5)
-    9
-    """
-
-    def add(self, a, b):
-        """
-        Add two numbers together.
-
-        Parameters
-        ----------
-        a : int or float
-            First number.
-        b : int or float
-            Second number.
-
-        Returns
-        -------
-        int or float
-            Sum of `a` and `b`.
-        """
-        return a + b
-```
-
-### Documenting Modules
-
-Include a module-level docstring at the beginning of each file, detailing the module's purpose and any notable information.
-
-```python
-"""
-This module provides a Calculator class for performing basic arithmetic operations.
-"""
-```
-
-## Code Formatting
-
-- **Indentation**: Use 4 spaces per indentation level.
-- **Line Length**: Prefer lines to be 79 characters or less.
-- **Variable Names**: Use descriptive names and adhere to the `snake_case` naming convention.
-- **Comments**: Use comments to explain the "why" behind code, not the "what".
-
-## Examples
-
-Provide examples using the doctest format to demonstrate function usage.
-
-```python
-def multiply(a, b):
-    """
-    Multiply `a` by `b`.
-
-    Parameters
-    ----------
-    a : int or float
-        First number.
-    b : int or float
-        Second number.
-
-    Returns
-    -------
-    int or float
-        Product of `a` and `b`.
-
-    Examples
-    --------
-    >>> multiply(2, 3)
-    6
-    """
-    return a * b
-```
-
-## Conclusion
-
-Adhering to the NumPy docstring style can significantly improve the quality and consistency of our project documentation, especially when used in conjunction with Sphinx. This style is particularly useful for projects with a focus on numerical computing. For comprehensive details on the NumPy docstring standard and Sphinx, refer to the respective documentation resources.
-
-By following these guidelines, we enhance the documentation of our codebase, making it more accessible and easier to maintain.
+By including this general structure and examples in your guide, developers will have a clearer understanding of how to write effective docstrings in both PEP 257 and NumPy styles and integrate them seamlessly with Sphinx to generate high-quality documentation.
