@@ -8,11 +8,11 @@ Parameters
 ----------
 {{#args}}
 {{var}} : {{typePlaceholder}}
-    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
+    {{descriptionPlaceholder}}
 {{/args}}
 {{#kwargs}}
 {{var}} : {{typePlaceholder}}, optional
-    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}. Defaults to {{&default}}.
+    {{descriptionPlaceholder}}. Defaults to {{&default}}.
 {{/kwargs}}
 {{/parametersExist}}
 {{#exceptionsExist}}
@@ -20,8 +20,8 @@ Parameters
 Raises
 ------
 {{#exceptions}}
-{{type}} 
-    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
+{{type}}
+    {{descriptionPlaceholder}}
 {{/exceptions}}
 {{/exceptionsExist}}
 {{#returnsExist}}
@@ -30,7 +30,7 @@ Returns
 -------
 {{#returns}}
 {{typePlaceholder}}
-    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
+    {{descriptionPlaceholder}}
 {{/returns}}
 {{/returnsExist}}
 {{#yieldsExist}}
@@ -39,6 +39,6 @@ Yields
 ------
 {{#yields}}
 {{typePlaceholder}}
-    {{#if descriptionPlaceholder}}: {{descriptionPlaceholder}}{{else}}: [description]{{/if}}
+    {{descriptionPlaceholder}}
 {{/yields}}
 {{/yieldsExist}}
