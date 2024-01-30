@@ -1,0 +1,89 @@
+/* custom.css */
+
+/* General body styling */
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #333333;
+    background-color: #f9f9f9;
+}
+
+/* Header styling */
+.header {
+    background-color: #0055a4; /* A shade of blue commonly used by EIA */
+    color: #ffffff;
+    padding: 10px 0;
+    text-align: center;
+}
+
+/* Navigation menu styling */
+.navbar {
+    background-color: #e1e1e1;
+    padding: 10px 0;
+}
+
+.navbar a {
+    color: #0055a4;
+    padding: 10px;
+    text-decoration: none;
+}
+
+.navbar a:hover {
+    background-color: #0055a4;
+    color: #ffffff;
+}
+
+/* Main content styling */
+.content {
+    background-color: #ffffff;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    color: #0055a4;
+}
+
+/* Links */
+a {
+    color: #007bff;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 10px;
+    border: 1px solid #dddddd;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+/* Code blocks */
+.code-block {
+    background-color: #f7f7f7;
+    border-left: 3px solid #0055a4;
+    padding: 10px;
+    font-family: monospace;
+    overflow-x: auto;
+}
+
+/* Footer styling */
+.footer {
+    background-color: #333333;
+    color: #ffffff;
+    text-align: center;
+    padding: 10px 0;
+    margin-top: 20px;
+}

@@ -11,6 +11,23 @@ import requests
 
 
 def read_zip(zip_fn, extract_fn=None):
+    """_summary_
+    
+    
+    
+    Parameters
+    ----------
+    zip_fn : _type_
+        _description_
+    extract_fn : _type_, optional
+        _description_. Defaults to None.
+    
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
     zf = ZipFile(zip_fn)
     if extract_fn:
         return zf.read(extract_fn)
