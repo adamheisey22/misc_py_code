@@ -1,34 +1,44 @@
-{{!
-    This is a custom AutoDocstring template combining Sphinx and NumPy styles.
-    Place this template in the AutoDocstring extension's template directory.
-}}
-def {{name}}({{#args}}{{.}}, {{/args}}):
-    """
-    {{#if summary}}{{summary}}
+{{! Custom Docstring Template combining NumPy and Sphinx styles }}
+{{summaryPlaceholder}}
 
-    {{/if}}{{#if args}}
-    Parameters
-    ----------
-    {{#args}}{{{name}}} : {{type}}
-        {{description}}
-    {{/args}}
-    {{/if}}{{#if returns}}
-    Returns
-    -------
-    {{returns.type}}
-        {{returns.description}}
-    {{/if}}
-    {{#if examples}}
-    Examples
-    --------
-    {{examples}}
+{{extendedSummaryPlaceholder}}
+{{#parametersExist}}
 
-    {{/if}}See Also
-    --------
-    {{#see_also}}{{.}}, {{/see_also}}
+Parameters
+----------
+{{#args}}
+{{var}} : {{typePlaceholder}}
+    {{descriptionPlaceholder}}
+{{/args}}
+{{#kwargs}}
+{{var}} : {{typePlaceholder}}, optional
+    {{descriptionPlaceholder}}. Defaults to {{&default}}.
+{{/kwargs}}
+{{/parametersExist}}
+{{#exceptionsExist}}
 
-    Notes
-    -----
-    {{#if notes}}{{notes}}{{else}}Add notes here.{{/if}}
-    """
-    {{#if body}}{{{body}}}{{else}}pass{{/if}}
+Raises
+------
+{{#exceptions}}
+{{type}} : 
+    {{descriptionPlaceholder}}
+{{/exceptions}}
+{{/exceptionsExist}}
+{{#returnsExist}}
+
+Returns
+-------
+{{#returns}}
+{{typePlaceholder}} 
+    {{descriptionPlaceholder}}
+{{/returns}}
+{{/returnsExist}}
+{{#yieldsExist}}
+
+Yields
+------
+{{#yields}}
+{{typePlaceholder}} 
+    {{descriptionPlaceholder}}
+{{/yields}}
+{{/yieldsExist}}
