@@ -1,0 +1,28 @@
+{
+    "NumPy/Sphinx Compatible Docstring": {
+        "prefix": "docs",
+        "body": [
+            "def ${1:function_name}(${2:parameters}):",
+            "    \"\"\"",
+            "    ${3:Function description.}",
+            "    ",
+            "    Parameters",
+            "    ----------",
+            "${4:parameter : type}",
+            "        ${5:Description of parameter.}",
+            "    ",
+            "    Returns",
+            "    -------",
+            "${6:return_type}",
+            "        ${7:Description of return value.}",
+            "    ",
+            "    Examples",
+            "    --------",
+            "    >>> ${1:function_name}(${8:example_parameters})",
+            "    ${9:expected_result}",
+            "    \"\"\"",
+            "    $0"
+        ],
+        "description": "Docstring for Python functions compatible with NumPy and Sphinx."
+    }
+}
