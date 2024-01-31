@@ -1,81 +1,103 @@
 /* Base color variables */
 :root {
-    --eia-dark-blue: #002d62;
-    --eia-light-blue: #046b99;
-    --eia-accent-yellow: #ffcc00;
-    --eia-grey: #666;
-    --eia-white: #fff;
+    --eia-dark-blue: #004a77; /* Adjusted to match the darker blue in the header */
+    --eia-light-blue: #0071bc; /* Adjusted to match the lighter blue of the navigation bar */
+    --eia-text-color: #333; /* Standard text color, appears to be a dark gray */
+    --eia-background-color: #f1f1f1; /* Light background color for content areas */
+    --eia-border-color: #ccc; /* Border color for separation and emphasis */
 }
 
 /* General body styling */
 body {
     font-family: 'Arial', sans-serif;
-    color: var(--eia-grey);
-    background-color: var(--eia-white);
+    color: var(--eia-text-color);
+    background-color: var(--eia-background-color);
+    line-height: 1.6; /* Provides a comfortable reading experience */
 }
 
-/* Header styling */
+/* Header styling with logo */
 .header {
     background-color: var(--eia-dark-blue);
-    color: var(--eia-white);
+    color: var(--eia-text-color);
+    position: relative; /* For absolute positioning of the logo */
+    padding: 10px 20px; /* Spacing around content */
+}
+
+/* Logo styling */
+.header-logo {
+    position: absolute;
+    top: 10px; /* Adjust as needed */
+    left: 20px; /* Adjust as needed */
+    width: 150px; /* Logo width */
+    height: auto; /* Maintain aspect ratio */
+    background-image: url('path-to-your-logo.png'); /* Replace with your logo's path */
+    background-size: contain;
+    background-repeat: no-repeat;
 }
 
 /* Navigation bar styling */
 .navbar {
     background-color: var(--eia-light-blue);
     color: var(--eia-white);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: flex-start;
 }
 
-/* Buttons styling */
-.button {
-    background-color: var(--eia-accent-yellow);
-    color: var(--eia-dark-blue);
-    border: none;
-    padding: 10px 20px;
-    text-transform: uppercase;
-    font-weight: bold;
-    cursor: pointer;
+.navbar li {
+    padding: 10px 15px;
+    display: inline-block;
 }
 
-/* Form input fields styling */
-input[type="text"],
-input[type="email"],
-select {
-    width: 100%;
-    padding: 10px;
-    margin: 10px 0;
-    border: 1px solid var(--eia-grey);
-    border-radius: 4px;
-}
-
-/* Form submit button styling */
-input[type="submit"] {
-    background-color: var(--eia-accent-yellow);
-    color: var(--eia-dark-blue);
-    padding: 12px 20px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-/* Hover effects */
-.button:hover,
-input[type="submit"]:hover {
-    background-color: var(--eia-dark-blue);
+.navbar li a {
     color: var(--eia-white);
+    text-decoration: none;
 }
 
-/* Card styling */
-.card {
-    background-color: var(--eia-white);
-    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-    padding: 16px;
-    margin: 16px 0;
+.navbar li a:hover {
+    text-decoration: underline;
 }
 
-/* Responsive layout */
+/* Content styling */
+.content {
+    background-color: var(--eia-background-color);
+    padding: 20px;
+    border-top: 5px solid var(--eia-light-blue); /* Highlighting top border as seen in the screenshot */
+}
+
+/* Headings styling */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--eia-dark-blue);
+}
+
+/* Link styling */
+a {
+    color: var(--eia-light-blue);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Footer styling */
+.footer {
+    background-color: var(--eia-dark-blue);
+    color: var(--eia-text-color);
+    padding: 20px;
+    text-align: center;
+}
+
+/* Media queries for responsive design */
 @media (max-width: 768px) {
     .navbar {
         flex-direction: column;
+    }
+
+    .header-logo {
+        position: static; /* Logo realigns for mobile view */
+        margin: 0 auto; /* Center the logo */
     }
 }
