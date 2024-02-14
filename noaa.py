@@ -72,11 +72,43 @@ def update_table_schema(conn, table_name, df):
     conn.commit()
 
 def insert_into_database(conn, table_name, data):
+    """_summary_
+    
+    
+    
+    Parameters
+    ----------
+    conn : _type_
+        _description_
+    table_name : _type_
+        _description_
+    data : _type_
+        _description_
+    """
     if data is not None:
         update_table_schema(conn, table_name, data)
         data.to_sql(table_name, conn, if_exists='append', index=False)
 
 def process_downloaded_data(conn, table_name, text, year, station_id, chunksize=10000):
+    """_summary_
+    
+    
+    
+    Parameters
+    ----------
+    conn : _type_
+        _description_
+    table_name : _type_
+        _description_
+    text : _type_
+        _description_
+    year : _type_
+        _description_
+    station_id : _type_
+        _description_
+    chunksize : int, optional
+        _description_. Defaults to 10000.
+    """
     for chunk in pd.read_csv(StringIO(text), chunksize=chunksize):
         chunk['year'] = year
         chunk['station_id'] = station_id
