@@ -104,3 +104,43 @@ for table_name in key_list:
 session.close()
 
 print("Data has been loaded into the database.")
+
+
+
+####new
+
+def create_unique_id(df):
+    # Temporarily rename the index to avoid conflicts
+    temp_index_name = df.index.name if df.index.name is not None else 'index'
+    # Ensure the temporary index name does not conflict with existing columns
+    while temp_index_name in df.columns:
+        temp_index_name += '_temp'
+
+    df.index.rename(temp_index_name, inplace=True)
+    df_reset = df.reset_index()  # Now resetting the index should not cause conflicts
+    # Create the 'id' by concatenating all column values into a single string
+    df_reset['id'] = df_reset.apply(lambda row: '-'.join(row.astype(str)), axis=1)
+    # Set the 'id' column as the new index
+    df_final = df_reset.set_index('id')
+    # Restore the original index name if it was changed
+    if df.index.name != df.index.name:
+        df.index.rename(df.index.name, inplace=True)
+    return df_final
+
+# Example usage
+df1 = pd.DataFrame({
+    'pt': [1, 2, 3],
+    'day': pd.to_datetime(['2021-01-01', '2021-01-02', '2021-01-03']),
+    'value': [10, 20, 30]
+}).set_index('pt')
+
+df2 = pd.DataFrame({
+    'y': [1, 2, 3],
+    'day': pd.to_datetime(['2021-02-01', '2021-02-02', '2021-02-03']),
+    'value': [100, 200, 300]
+}).set_index('y')
+
+dataframes = {'Table1': df1, 'Table2': df2}
+
+for key, df in dataframes.items():
+    dataframes[key] = create_unique_id(df)
