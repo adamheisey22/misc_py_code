@@ -68,3 +68,39 @@ with open('database_models.py', 'w') as f:
     f.write("session = Session()\n\n")
     f.write("# Add data handling below as required\n")
     f.write("session.close()\n
+
+# Assuming this code is added at the end of 'database_models.py'
+def load_data_to_db(session, table_class, dataframe):
+    # Iterate over the rows of the DataFrame
+    for index, row in dataframe.iterrows():
+        # Convert the row to a dictionary, including the index
+        data_dict = row.to_dict()
+        data_dict[dataframe.index.name] = index
+        # Create an instance of the table class
+        obj = table_class(**data_dict)
+        # Add to the session
+        session.add(obj)
+    # Commit the transaction
+    session.commit()
+
+# Create a session
+Session = sessionmaker(bind=engine)
+session = Session()
+
+# Dictionary of DataFrames, assumed to already be defined
+# dataframes = {'Table1': df1, 'Table2': df2} - defined earlier in your script
+key_list = dataframes.keys()  # or any list of keys that represents the tables you have
+
+# Load data for each table listed in key_list
+for table_name in key_list:
+    # Retrieve the table class dynamically using globals()
+    table_class = globals()[table_name]
+    # Retrieve the dataframe associated with the table
+    dataframe = dataframes[table_name]
+    # Load data to database
+    load_data_to_db(session, table_class, dataframe)
+
+# Close the session when done
+session.close()
+
+print("Data has been loaded into the database.")
