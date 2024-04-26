@@ -42,11 +42,37 @@ class {class_name}(Base):
 
 
 ##next
+import inspect
+from models import Base  # Assuming models.py contains Base and all table definitions
+
+def create_table_mapping(module):
+    """
+    Creates a mapping of table names to their SQLAlchemy class definitions
+    found in the given module. Assumes that each table class inherits from `Base`
+    and that the primary key column is named 'id'.
+    
+    Args:
+    - module: A module containing SQLAlchemy table class definitions.
+
+    Returns:
+    - A dictionary mapping table class names to their class definitions.
+    """
+    mapping = {}
+    for name, obj in inspect.getmembers(module):
+        if inspect.isclass(obj) and issubclass(obj, Base) and obj.__tablename__:
+            mapping[obj.__tablename__] = obj
+    return mapping
+
+# Use the function to create the table mapping
+table_mapping = create_table_mapping(models)
+
+
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
-from models import Base, Table1, Table2  # Import your table definitions
+import models  # Import your module with table definitions
+from models import Base
 
 def prepare_dates(df):
     for col in df.columns:
@@ -74,29 +100,25 @@ def load_data_to_db(session, table_class, dataframe):
 
 # Initialize database and session
 engine = create_engine('sqlite:///mydatabase.db')
-Base.metadata.create_all(engine)  # Make sure Base is imported from models
+Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# Example DataFrame creation
+# Use the function to create the table mapping
+table_mapping = create_table_mapping(models)
+
+# Example DataFrame creation and loading
 dataframes = {
-    'Table1': pd.DataFrame({
+    'table1': pd.DataFrame({
         'id': [1, 2, 3],
         'name': ['Alice', 'Bob', 'Cathy'],
         'date': pd.to_datetime(['2021-01-01', '2021-02-01', '2021-03-01'])
     }),
-    'Table2': pd.DataFrame({
+    'table2': pd.DataFrame({
         'id': [4, 5, 6],
         'description': ['Desc1', 'Desc2', 'Desc3'],
         'created_on': pd.to_datetime(['2022-01-01', '2022-02-01', '2022-03-01'])
     })
-}
-
-# Define a mapping of DataFrame names to table classes explicitly
-table_mapping = {
-    'Table1': Table1,
-    'Table2': Table2,
-    # Add other table class mappings here
 }
 
 # Load data using the mapping
