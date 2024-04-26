@@ -42,22 +42,36 @@ class {class_name}(Base):
 
 
 ##next
+import pandas as pd
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
+
 def prepare_dates(df):
     for col in df.columns:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             df[col] = pd.to_datetime(df[col]).dt.date
     return df
 
-def load_data_to_db(session, table_class, dataframe):
+def load_data_to_db(session, table_class, dataframe, unique_key):
     # Prepare date columns
     dataframe = prepare_dates(dataframe)
     
     for index, row in dataframe.iterrows():
         data_dict = row.to_dict()
         data_dict[dataframe.index.name] = index
-        obj = table_class(**data_dict)
-        session.add(obj)
-    session.commit()
+        
+        # Check if the entry already exists in the database
+        exists = session.query(table_class).filter_by(**{unique_key: data_dict[unique_key]}).first()
+        if not exists:
+            try:
+                obj = table_class(**data_dict)
+                session.add(obj)
+                session.commit()
+            except IntegrityError:
+                session.rollback()  # Rollback the changes on error
+        else:
+            print(f"Entry with {unique_key} = {data_dict[unique_key]} already exists and was not added.")
 
 # Initialize database and session
 engine = create_engine('sqlite:///mydatabase.db')
@@ -65,11 +79,17 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# Load data to database
-for table_name in dataframes:
-    table_class = globals()[table_name]
+# Mapping of DataFrame names to table classes and their unique identifiers
+table_mapping = {
+    'Table1': {'class': Table1, 'unique_key': 'id'},
+    'Table2': {'class': Table2, 'unique_key': 'id'},
+    # Add other tables and their unique keys here
+}
+
+# Assume dataframes dictionary is loaded into memory
+for table_name, info in table_mapping.items():
     dataframe = dataframes[table_name]
-    load_data_to_db(session, table_class, dataframe)
+    load_data_to_db(session, info['class'], dataframe, info['unique_key'])
 
 session.close()
 print("Data has been loaded into the database.")
