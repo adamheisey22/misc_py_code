@@ -243,3 +243,65 @@ for table_name, dataframe in dataframes.items():
             load_data_to_db(session, table_class, dataframe)
 
 print("Database operations completed.")
+
+
+##try this
+import pandas as pd
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
+import models  # Import your module with table definitions
+from models import Base
+
+def prepare_dates(df):
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = pd.to_datetime(df[col]).dt.date
+    return df
+
+def load_data_to_db(session, table_class, dataframe):
+    dataframe = prepare_dates(dataframe)
+    for index, row in dataframe.iterrows():
+        data_dict = row.to_dict()
+        if dataframe.index.name:
+            data_dict[dataframe.index.name] = index
+
+        # Check for existence using the primary key (id), avoiding the costly query operation
+        obj = table_class(**data_dict)
+        session.merge(obj)  # `merge` instead of `add` will check and update if exists, otherwise insert
+
+    try:
+        session.commit()  # Commit all the operations as a batch
+    except IntegrityError:
+        session.rollback()
+
+# Initialize database and session
+engine = create_engine('sqlite:///mydatabase.db')
+Base.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+session = Session()
+
+# Use the function to create the table mapping
+table_mapping = create_table_mapping(models)
+
+# Example DataFrame creation and loading
+dataframes = {
+    'table1': pd.DataFrame({
+        'id': [1, 2, 3],
+        'name': ['Alice', 'Bob', 'Cathy'],
+        'date': pd.to_datetime(['2021-01-01', '2021-02-01', '2021-03-01'])
+    }),
+    'table2': pd.DataFrame({
+        'id': [4, 5, 6],
+        'description': ['Desc1', 'Desc2', 'Desc3'],
+        'created_on': pd.to_datetime(['2022-01-01', '2022-02-01', '2022-03-01'])
+    })
+}
+
+# Load data using the mapping
+for table_name, table_class in table_mapping.items():
+    dataframe = dataframes[table_name]
+    load_data_to_db(session, table_class, dataframe)
+
+session.close()
+print("Data has been loaded into the database.")
