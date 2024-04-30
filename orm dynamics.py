@@ -128,3 +128,60 @@ for table_name, table_class in table_mapping.items():
 
 session.close()
 print("Data has been loaded into the database.")
+
+
+#new
+import pandas as pd
+from sqlalchemy import create_engine, Column, Integer
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+import models  # This is your module with ORM definitions
+import inspect
+
+# Function to prepare date columns
+def prepare_dates(df):
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = pd.to_datetime(df[col]).dt.date
+    return df
+
+# Function to load data into database efficiently
+def load_data_to_db(session, table_class, dataframe):
+    dataframe = prepare_dates(dataframe)
+    # Convert DataFrame to list of dictionaries suitable for batch insert
+    data_records = dataframe.to_dict(orient='records')
+    # Bulk insert all records at once
+    session.bulk_insert_mappings(table_class, data_records)
+    session.commit()
+
+# Define Base for ORM classes
+Base = declarative_base()
+
+# Initialize database and session
+engine = create_engine('sqlite:///mydatabase.db')
+Base.metadata.drop_all(engine)  # Drop all tables
+Base.metadata.create_all(engine)  # Create all tables
+
+# Session creation
+Session = sessionmaker(bind=engine)
+session = Session()
+
+# Automatically create table_classes dictionary from models module
+table_classes = {cls.__name__: cls for name, cls in inspect.getmembers(models, inspect.isclass)
+                 if issubclass(cls, Base) and cls is not Base}
+
+# Dictionary of DataFrames (example usage)
+dataframes = {
+    'ExampleTable': pd.DataFrame({'date': ['2023-01-01'], 'value': [100]}),
+    # Add other dataframes here
+}
+
+# Load data to database
+for table_name, dataframe in dataframes.items():
+    if table_name in table_classes:
+        table_class = table_classes[table_name]
+        load_data_to_db(session, table_class, dataframe)
+
+session.close()
+print("Data has been loaded into the database.")
+
