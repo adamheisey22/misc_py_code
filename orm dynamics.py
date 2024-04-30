@@ -185,3 +185,61 @@ for table_name, dataframe in dataframes.items():
 session.close()
 print("Data has been loaded into the database.")
 
+
+
+####NEW
+import pandas as pd
+from sqlalchemy import create_engine, Column, Integer
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+import models  # Assumes all ORM classes are defined here
+import inspect
+
+Base = declarative_base()
+
+def prepare_dates(df):
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = pd.to_datetime(df[col]).dt.date
+    return df
+
+def load_data_to_db(session, table_class, dataframe):
+    try:
+        dataframe = prepare_dates(dataframe)
+        data_records = dataframe.to_dict(orient='records')
+        if data_records:  # Ensure there is data to insert
+            session.bulk_insert_mappings(table_class, data_records)
+            session.commit()
+            print(f"Data successfully loaded into {table_class.__tablename__}.")
+        else:
+            print(f"No data to load for {table_class.__tablename__}.")
+    except Exception as e:
+        session.rollback()
+        print(f"Error loading data into {table_class.__tablename__}: {e}")
+    finally:
+        session.close()
+
+# Database initialization
+engine = create_engine('sqlite:///mydatabase.db')
+Base.metadata.create_all(engine)
+
+Session = sessionmaker(bind=engine)
+
+# Automatically generate table_classes from models
+table_classes = {cls.__name__: cls for name, cls in inspect.getmembers(models, inspect.isclass)
+                 if issubclass(cls, Base) and cls is not Base}
+
+# Example DataFrame dictionary
+dataframes = {
+    'ExampleTable': pd.DataFrame({'date': ['2023-01-01'], 'value': [100]}),
+    # Ensure these DataFrames are properly populated
+}
+
+# Load data
+for table_name, dataframe in dataframes.items():
+    if table_name in table_classes:
+        with Session() as session:
+            table_class = table_classes[table_name]
+            load_data_to_db(session, table_class, dataframe)
+
+print("Database operations completed.")
