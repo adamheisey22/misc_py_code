@@ -1,10 +1,11 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-from pathlib import Path
+import argparse
 import logging
+from pathlib import Path
 import tomllib
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk  # For progress bar
 
-# Assuming these functions are defined in your imported modules
 from definitions import PROJECT_ROOT, OUTPUT_ROOT
 from src.integrator.utilities import make_output_dir, setup_logger
 from src.integrator.runner import run_elec_solo, run_h2_solo
@@ -14,63 +15,81 @@ from src.integrator.unified_elec_hyd_res import run_unified_res_elec_h2
 # Specify config path
 default_config_path = Path(PROJECT_ROOT, 'src/integrator', 'run_config.toml')
 
-# GUI Function to handle mode execution
-def run_model():
-    selected_mode = mode_var.get()
-    debug_mode = debug_var.get()
-    
+# Function to handle mode selection and run the corresponding function
+def run_selected_mode(mode):
     # Initial setup of output directory and logger
-    output_dir = make_output_dir(OUTPUT_ROOT)
-    logger = setup_logger(output_dir)
+    OUTPUT_ROOT.mkdir(exist_ok=True)
+    OUTPUT_ROOT = make_output_dir(OUTPUT_ROOT)
+    logger = setup_logger(OUTPUT_ROOT)
     logger = logging.getLogger(__name__)
+    logger.info('Starting Logging')
     
-    if debug_mode:
-        logger.setLevel(logging.DEBUG)
-        logger.debug('Logging level set to DEBUG')
+    # Open the default config file
+    with open(default_config_path, 'rb') as src:
+        config = tomllib.load(src)
     
-    # If no mode is selected, use the default from the config file
-    if not selected_mode:
-        with open(default_config_path, 'rb') as src:
-            config = tomllib.load(src)
-        selected_mode = config['default_mode']
-    
-    logger.info(f'Model running in: {selected_mode} mode')
-
-    # Match the mode to run the appropriate function
-    if selected_mode == 'elec':
+    logger.info(f'Model running in: {mode} mode')
+    if mode == 'elec':
         run_elec_solo(config_path=default_config_path)
-    elif selected_mode == 'h2':
+    elif mode == 'h2':
         HYDROGEN_ROOT = PROJECT_ROOT / 'src/models/hydrogen'
         data_path = HYDROGEN_ROOT / 'inputs/single_region'
         run_h2_solo(data_path=data_path, config_path=default_config_path)
-    elif selected_mode == 'gs-combo':
+    elif mode == 'gs-combo':
         run_gs_combo(config_path=default_config_path)
-    elif selected_mode == 'unified-combo':
+    elif mode == 'unified-combo':
         run_unified_res_elec_h2(config_path=default_config_path)
     else:
-        logger.error('Unknown operation mode')
-        messagebox.showerror("Error", "Unknown operation mode selected")
+        logger.error('Unknown op mode... exiting')
+        messagebox.showerror("Error", "Unknown mode selected")
 
-# Create the main window
-root = tk.Tk()
-root.title("Model Runner")
+# Function to update the progress bar and display messages
+def on_run_button_click():
+    mode = mode_var.get()
+    if mode:
+        progress_bar.start(10)  # Start the progress bar
+        status_label.config(text=f"Running {mode} mode... Please wait.")
+        window.update()  # Force update the GUI
 
-# Mode selection
+        # Run the selected mode
+        try:
+            run_selected_mode(mode)
+            status_label.config(text=f"{mode.capitalize()} mode finished successfully!")
+            messagebox.showinfo("Success", f"{mode.capitalize()} mode has finished running.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {str(e)}")
+        finally:
+            progress_bar.stop()  # Stop the progress bar
+            window.after(2000, window.destroy)  # Close the window after 2 seconds
+    else:
+        messagebox.showwarning("Warning", "Please select a mode to run.")
+
+# Create GUI window
+window = tk.Tk()
+window.title("Model Runner")
+
+# Add a label
+label = tk.Label(window, text="Select Mode to Run:")
+label.pack(pady=10)
+
+# Add radio buttons for mode selection
 mode_var = tk.StringVar()
-debug_var = tk.BooleanVar()
 
-ttk.Label(root, text="Select Mode:").grid(row=0, column=0, padx=10, pady=10)
 modes = ['elec', 'h2', 'unified-combo', 'gs-combo']
-mode_menu = ttk.OptionMenu(root, mode_var, modes[0], *modes)
-mode_menu.grid(row=0, column=1, padx=10, pady=10)
+for mode in modes:
+    tk.Radiobutton(window, text=mode, variable=mode_var, value=mode).pack(anchor=tk.W)
 
-# Debug checkbox
-debug_checkbox = ttk.Checkbutton(root, text="Enable Debug", variable=debug_var)
-debug_checkbox.grid(row=1, column=0, columnspan=2, padx=10, pady=10)
+# Add a run button
+run_button = tk.Button(window, text="Run", command=on_run_button_click)
+run_button.pack(pady=20)
 
-# Run button
-run_button = ttk.Button(root, text="Run", command=run_model)
-run_button.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+# Add a progress bar
+progress_bar = ttk.Progressbar(window, mode='indeterminate')
+progress_bar.pack(pady=10)
 
-# Start the GUI loop
-root.mainloop()
+# Add a status label
+status_label = tk.Label(window, text="")
+status_label.pack(pady=10)
+
+# Start the GUI event loop
+window.mainloop()
