@@ -60,7 +60,9 @@ def on_run_button_click():
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
         finally:
             progress_bar.stop()  # Stop the progress bar
-            window.after(2000, window.destroy)  # Close the window after 2 seconds
+            # Reset the status label and progress bar for the next run
+            status_label.config(text="Ready to run another mode")
+            run_button.config(state=tk.NORMAL)  # Re-enable the Run button
     else:
         messagebox.showwarning("Warning", "Please select a mode to run.")
 
@@ -88,7 +90,7 @@ progress_bar = ttk.Progressbar(window, mode='indeterminate')
 progress_bar.pack(pady=10)
 
 # Add a status label
-status_label = tk.Label(window, text="")
+status_label = tk.Label(window, text="Ready to run a mode")
 status_label.pack(pady=10)
 
 # Start the GUI event loop
