@@ -1,6 +1,6 @@
 import argparse
 import logging
-import tomllib
+import toml
 import csv
 import tkinter as tk
 from tkinter import messagebox, filedialog
@@ -19,8 +19,8 @@ default_config_path = Path(PROJECT_ROOT, 'src/integrator', 'run_config.toml')
 def load_toml_file():
     filepath = filedialog.askopenfilename(filetypes=[("TOML files", "*.toml")])
     if filepath:
-        with open(filepath, 'rb') as src:
-            config = tomllib.load(src)
+        with open(filepath, 'r') as src:
+            config = toml.load(src)
         return config, filepath
     return None, None
 
@@ -41,29 +41,56 @@ def edit_toml_file():
         edit_window = tk.Toplevel(window)
         edit_window.title(f"Edit {Path(filepath).name}")
 
+        canvas = tk.Canvas(edit_window)
+        scrollbar = tk.Scrollbar(edit_window, orient="vertical", command=canvas.yview)
+        scroll_frame = tk.Frame(canvas)
+
+        scroll_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Create an entry widget for each key-value pair in the config
         for key, value in config.items():
-            frame = tk.Frame(edit_window)
-            frame.pack(padx=5, pady=5)
-            tk.Label(frame, text=f"{key}: ").pack(side=tk.LEFT)
-            entry = tk.Entry(frame, width=40)
+            frame = tk.Frame(scroll_frame)
+            frame.pack(padx=10, pady=5, fill="x", expand=True)
+
+            # Create a label for the key
+            label = tk.Label(frame, text=f"{key}: ", anchor="w")
+            label.pack(side=tk.LEFT, fill="x", padx=5)
+
+            # Create an entry for the value with increased width
+            entry = tk.Entry(frame, width=60)  # Adjust width here
             entry.insert(tk.END, str(value))
-            entry.pack(side=tk.RIGHT)
+            entry.pack(side=tk.RIGHT, padx=5)
+
             # Store reference to entries to retrieve the values later
             entry._key = key
             frame._entry = entry
 
         def save_changes():
-            for child in edit_window.winfo_children():
+            # Update the config with new values from the entry widgets
+            for child in scroll_frame.winfo_children():
                 for frame in child.winfo_children():
                     if hasattr(frame, '_entry'):
                         key = frame._entry._key
                         config[key] = frame._entry.get()
-            with open(filepath, 'wb') as f:
-                tomllib.dump(config, f)
+
+            # Save changes back to the TOML file using toml
+            with open(filepath, 'w') as f:
+                toml.dump(config, f)
             messagebox.showinfo("Success", f"Config file '{Path(filepath).name}' saved successfully!")
             edit_window.destroy()
 
-        tk.Button(edit_window, text="Save Changes", command=save_changes).pack(pady=10)
+        # Add a save button at the bottom of the window
+        save_button = tk.Button(edit_window, text="Save Changes", command=save_changes)
+        save_button.pack(pady=10)
 
 # Function to handle mode selection and run the corresponding function
 def run_selected_mode(mode, config_path=default_config_path):
@@ -75,8 +102,8 @@ def run_selected_mode(mode, config_path=default_config_path):
     logger.info('Starting Logging')
 
     # Open the default config file
-    with open(config_path, 'rb') as src:
-        config = tomllib.load(src)
+    with open(config_path, 'r') as src:
+        config = toml.load(src)
 
     logger.info(f'Model running in: {mode} mode')
     if mode == 'elec':
