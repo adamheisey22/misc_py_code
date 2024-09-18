@@ -2,13 +2,13 @@ import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 import toml
-import csv
 from pathlib import Path
 from definitions import PROJECT_ROOT, OUTPUT_ROOT
 from src.integrator.utilities import make_output_dir, setup_logger
 from src.integrator.runner import run_elec_solo, run_h2_solo
 from src.integrator.gs_elec_hyd_res import run_gs_combo
 from src.integrator.unified_elec_hyd_res import run_unified_res_elec_h2
+import os
 
 # Specify default config path
 default_config_path = Path(PROJECT_ROOT, 'src/integrator', 'run_config.toml')
@@ -50,63 +50,60 @@ app.layout = dbc.Container([
     ], style={"paddingTop": "20px"}),
 ])
 
-# Callback to handle the running of the selected mode
+# Combined callback to handle both running the mode and editing the TOML file
 @app.callback(
     [Output('progress-output', 'children'), Output('status-output', 'children')],
-    [Input('run-button', 'n_clicks')],
+    [Input('run-button', 'n_clicks'), Input('edit-config-button', 'n_clicks')],
     [State('mode-selector', 'value')],
     prevent_initial_call=True
 )
-def run_selected_mode(n_clicks, mode):
-    if mode:
-        progress_message = f"Running {mode} mode... Please wait."
-        try:
-            OUTPUT_ROOT.mkdir(exist_ok=True)
-            output_dir = make_output_dir(OUTPUT_ROOT)
-            logger = setup_logger(output_dir)
-            logger.info('Starting Logging')
-            with open(default_config_path, 'r') as src:
+def handle_mode_and_edit(run_clicks, edit_clicks, mode):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        return "", "No action triggered."
+
+    # Determine which button was clicked
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if button_id == 'run-button':
+        if mode:
+            progress_message = f"Running {mode} mode... Please wait."
+            try:
+                OUTPUT_ROOT.mkdir(exist_ok=True)
+                output_dir = make_output_dir(OUTPUT_ROOT)
+                logger = setup_logger(output_dir)
+                logger.info('Starting Logging')
+                with open(default_config_path, 'r') as src:
+                    config = toml.load(src)
+
+                if mode == 'elec':
+                    run_elec_solo(config_path=default_config_path)
+                elif mode == 'h2':
+                    HYDROGEN_ROOT = PROJECT_ROOT / 'src/models/hydrogen'
+                    data_path = HYDROGEN_ROOT / 'inputs/single_region'
+                    run_h2_solo(data_path=data_path, config_path=default_config_path)
+                elif mode == 'gs-combo':
+                    run_gs_combo(config_path=default_config_path)
+                elif mode == 'unified-combo':
+                    run_unified_res_elec_h2(config_path=default_config_path)
+                status_message = f"{mode.capitalize()} mode finished successfully!"
+            except Exception as e:
+                status_message = f"An error occurred: {str(e)}"
+        else:
+            progress_message = ""
+            status_message = "Please select a mode to run."
+        return progress_message, status_message
+
+    elif button_id == 'edit-config-button':
+        filepath = default_config_path  # Simplified for demo; normally you'd select the file
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as src:
                 config = toml.load(src)
+            config_summary = f"Config file {Path(filepath).name} loaded successfully. Editing feature to be implemented."
+            return "", config_summary
 
-            if mode == 'elec':
-                run_elec_solo(config_path=default_config_path)
-            elif mode == 'h2':
-                HYDROGEN_ROOT = PROJECT_ROOT / 'src/models/hydrogen'
-                data_path = HYDROGEN_ROOT / 'inputs/single_region'
-                run_h2_solo(data_path=data_path, config_path=default_config_path)
-            elif mode == 'gs-combo':
-                run_gs_combo(config_path=default_config_path)
-            elif mode == 'unified-combo':
-                run_unified_res_elec_h2(config_path=default_config_path)
-            status_message = f"{mode.capitalize()} mode finished successfully!"
-        except Exception as e:
-            status_message = f"An error occurred: {str(e)}"
-    else:
-        progress_message = ""
-        status_message = "Please select a mode to run."
-
-    return progress_message, status_message
-
-
-# Callback to handle config file editing (TOML)
-@app.callback(
-    Output('status-output', 'children'),
-    [Input('edit-config-button', 'n_clicks')],
-    prevent_initial_call=True
-)
-def edit_toml_file(n_clicks):
-    filepath = filedialog.askopenfilename(filetypes=[("TOML files", "*.toml")])
-    if filepath:
-        with open(filepath, 'r') as src:
-            config = toml.load(src)
-
-        # Here you could implement a more sophisticated editor in the Dash app if needed
-        # or just print out a summary of the TOML file
-        config_summary = f"Config file {Path(filepath).name} loaded successfully. Editing feature to be implemented."
-
-        return config_summary
-
-    return "No config file selected."
+        return "", "No config file found."
 
 
 if __name__ == '__main__':
