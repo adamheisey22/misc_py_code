@@ -14,11 +14,10 @@ import tkinter as tk
 import ast
 from tkinter import messagebox, filedialog
 from tkinter import ttk
+import subprocess
 from pathlib import Path
 import datetime
 from definitions import PROJECT_ROOT, OUTPUT_ROOT
-from main import run_cases
-from src.integrator.utilities import make_dir, setup_logger
 
 # Specify default config path
 default_config_path = Path(PROJECT_ROOT, 'src/integrator', 'run_config.toml')
@@ -138,35 +137,19 @@ def edit_toml_file():
 
 
 def run_selected_mode(mode, config_path=default_config_path):
-    """Function to handle mode selection and run the corresponding function"""
+    """Function to run the main.py script with selected mode and config file"""
+    output_dir = OUTPUT_ROOT / f"{mode}_run_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create a unique output directory for each run using timestamp
-    timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    run_output_dir = OUTPUT_ROOT / f"{mode}_run_{timestamp}"
-    run_output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Setup a new logger for this run
-    logger = logging.getLogger(mode)  # Create a logger with the mode name
-    logger.setLevel(logging.INFO)
-    file_handler = logging.FileHandler(run_output_dir / 'run.log')
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    logger.info(f'Starting {mode} mode with output to {run_output_dir}')
-
-    # Load the config file
-    with open(config_path, 'r') as src:
-        config = toml.load(src)
-
-    # Running the model based on the selected mode and configuration
-    logger.info(f'Model running in: {mode} mode')
+    # Call main.py with the selected mode and config file
     try:
-        run_cases(mode, config)
-        logger.info(f'{mode.capitalize()} mode finished successfully!')
-    except Exception as e:
-        logger.error(f'Error occurred during {mode} mode: {str(e)}')
-        raise
+        subprocess.run(
+            ['python', 'main.py', '--mode', mode, '--config', str(config_path)],
+            check=True
+        )
+        messagebox.showinfo('Success', f"{mode.capitalize()} mode has finished running. See results in '{output_dir}'.")
+    except subprocess.CalledProcessError as e:
+        messagebox.showerror('Error', f'An error occurred while running the mode: {str(e)}')
 
 
 def on_run_button_click():
@@ -181,7 +164,6 @@ def on_run_button_click():
         try:
             run_selected_mode(mode)
             status_label.config(text=f'{mode.capitalize()} mode finished successfully!')
-            messagebox.showinfo('Success', f"{mode.capitalize()} mode has finished running. See results in 'output' folder")
         except Exception as e:
             messagebox.showerror('Error', f'An error occurred: {str(e)}')
         finally:
