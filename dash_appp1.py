@@ -1,11 +1,13 @@
 import dash
-from dash import dcc, html, Input, Output, State, ctx
+from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 import toml
 import base64
 import io
-from pathlib import Path
 import ast
+import subprocess
+from pathlib import Path
+import datetime
 
 # Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -37,7 +39,8 @@ app.layout = dbc.Container([
 
 ], fluid=True)
 
-# Store the TOML content in memory
+
+# Store the TOML content in memory and create input fields for editing
 @app.callback(
     Output('config-editor', 'children'),
     Output('save-toml-button', 'disabled'),
@@ -94,7 +97,7 @@ def convert_value(value):
         return value
 
 
-# Callback to handle run button click
+# Callback to handle run button click and show progress
 @app.callback(
     Output('progress', 'value'),
     Input('run-button', 'n_clicks'),
@@ -102,8 +105,17 @@ def convert_value(value):
     prevent_initial_call=True
 )
 def run_mode(n_clicks, selected_mode):
-    # Placeholder logic to simulate running a process
-    return 100  # Progress is set to complete
+    output_dir = Path("OUTPUT_ROOT") / f"{selected_mode}_run_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        subprocess.run(
+            ['python', 'main.py', '--mode', selected_mode, '--config', str(Path("default_config_path"))],
+            check=True
+        )
+        return 100  # Complete the progress
+    except subprocess.CalledProcessError as e:
+        return 0  # Error, reset the progress
 
 
 if __name__ == '__main__':
