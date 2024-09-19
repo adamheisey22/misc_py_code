@@ -46,3 +46,43 @@ combined_feedback_df = extract_feedback_from_folder(folder_path)
 
 # Save the DataFrame to a CSV file
 combined_feedback_df.to_csv("combined_feedback.csv", index=False)
+
+
+import os
+import pandas as pd
+from docx import Document
+
+def write_dataframe_to_word(doc_path, dataframe):
+    """
+    Overwrites the content of a Word document with a table based on the given DataFrame.
+    """
+    # Create a new Document object (overwriting the existing one)
+    doc = Document()
+
+    # Add a table with as many rows as there are dataframe rows + 1 (for headers) and columns
+    table = doc.add_table(rows=dataframe.shape[0] + 1, cols=dataframe.shape[1])
+
+    # Add headers to the first row of the table
+    for i, column_name in enumerate(dataframe.columns):
+        table.cell(0, i).text = column_name
+
+    # Populate the table with DataFrame values
+    for row_index, row in dataframe.iterrows():
+        for col_index, value in enumerate(row):
+            table.cell(row_index + 1, col_index).text = str(value)
+
+    # Save the document, overwriting the previous content
+    doc.save(doc_path)
+
+# Example usage with a sample DataFrame
+data = {
+    "Name": ["Alice", "Bob", "Charlie"],
+    "Feedback": ["Great!", "Needs work.", "Excellent."]
+}
+df = pd.DataFrame(data)
+
+# Path to the output Word file
+output_doc_path = "output_feedback_table.docx"
+
+# Overwrite the Word document with the DataFrame's content as a table
+write_dataframe_to_word(output_doc_path, df)
