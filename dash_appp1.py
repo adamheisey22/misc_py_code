@@ -39,8 +39,7 @@ app.layout = dbc.Container([
     html.Div(id='output-state'),
 
     html.Hr(),
-    dbc.Button('Download Output Files', id='download-button', className='mt-2'),
-    dcc.Download(id='download-output')
+    html.Div(id='download-section')  # This will be where the download button/link is conditionally shown
 ], fluid=True)
 
 
@@ -104,6 +103,7 @@ def convert_value(value):
 # Callback to handle run button click and show progress
 @app.callback(
     Output('progress', 'value'),
+    Output('download-section', 'children'),
     Input('run-button', 'n_clicks'),
     State('mode-selector', 'value'),
     prevent_initial_call=True
@@ -117,9 +117,11 @@ def run_mode(n_clicks, selected_mode):
             ['python', 'main.py', '--mode', selected_mode, '--config', str(Path("default_config_path"))],
             check=True
         )
-        return 100  # Complete the progress
+        # Zip the output and create the download link
+        download_button = dbc.Button('Download Output Files', id='download-button', className='mt-2')
+        return 100, download_button  # Run successful, show download button
     except subprocess.CalledProcessError as e:
-        return 0  # Error, reset the progress
+        return 0, ''  # Error occurred, no download button
 
 
 # Helper function to zip the output directory
