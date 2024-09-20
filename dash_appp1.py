@@ -8,6 +8,7 @@ import ast
 import subprocess
 from pathlib import Path
 import datetime
+import zipfile
 
 # Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -35,8 +36,11 @@ app.layout = dbc.Container([
     html.Div(id='config-editor'),
     dbc.Button('Save Changes', id='save-toml-button', className='mt-2', disabled=True),
 
-    html.Div(id='output-state'),  # This will show the output of the run command
+    html.Div(id='output-state'),
 
+    html.Hr(),
+    dbc.Button('Download Output Files', id='download-button', className='mt-2'),
+    dcc.Download(id='download-output')
 ], fluid=True)
 
 
@@ -97,10 +101,9 @@ def convert_value(value):
         return value
 
 
-# Callback to handle run button click and show progress and output
+# Callback to handle run button click and show progress
 @app.callback(
     Output('progress', 'value'),
-    Output('output-state', 'children'),  # Display command output here
     Input('run-button', 'n_clicks'),
     State('mode-selector', 'value'),
     prevent_initial_call=True
@@ -110,14 +113,42 @@ def run_mode(n_clicks, selected_mode):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Run the subprocess and capture the output
-        result = subprocess.run(
+        subprocess.run(
             ['python', 'main.py', '--mode', selected_mode, '--config', str(Path("default_config_path"))],
-            capture_output=True, text=True, check=True
+            check=True
         )
-        return 100, f"Run completed successfully:\n{result.stdout}"  # Display success message with output
+        return 100  # Complete the progress
     except subprocess.CalledProcessError as e:
-        return 0, f"Error during run:\n{e.stderr}"  # Display error message
+        return 0  # Error, reset the progress
+
+
+# Helper function to zip the output directory
+def zip_output_directory(output_dir):
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for file in output_dir.rglob('*'):
+            zip_file.write(file, file.relative_to(output_dir))
+    zip_buffer.seek(0)
+    return zip_buffer
+
+
+# Callback to handle downloading the output directory
+@app.callback(
+    Output('download-output', 'data'),
+    Input('download-button', 'n_clicks'),
+    State('mode-selector', 'value'),
+    prevent_initial_call=True
+)
+def download_output(n_clicks, selected_mode):
+    if n_clicks:
+        output_dir = Path("OUTPUT_ROOT") / f"{selected_mode}_run_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        if output_dir.exists() and any(output_dir.iterdir()):
+            zip_buffer = zip_output_directory(output_dir)
+            encoded_zip = base64.b64encode(zip_buffer.read()).decode('utf-8')
+
+            return dict(content=encoded_zip, filename=f"{selected_mode}_output.zip")
+    return None
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
