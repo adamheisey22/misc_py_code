@@ -1,4 +1,7 @@
-# Add a Textarea to display output in real-time
+import threading
+import time
+
+# Add an interval for real-time updates
 app.layout = dbc.Container(
     [
         html.H1('BlueSky Model Runner', className='text-center'),
@@ -23,6 +26,8 @@ app.layout = dbc.Container(
             style={'width': '100%', 'height': 300},
             readOnly=True,  # Output is read-only
         ),
+        # Interval to trigger periodic updates to terminal output
+        dcc.Interval(id='interval-component', interval=2*1000, n_intervals=0),  # 2-second interval
         # Section for uploading and editing TOML config file
         html.Hr(),
         html.H4('Edit Config (TOML)'),
@@ -33,57 +38,49 @@ app.layout = dbc.Container(
     fluid=True,
 )
 
-# Callback to handle run button click, update progress, and show real-time terminal output
+# Global variable to store the terminal output
+terminal_output_data = ""
+
+def run_subprocess(selected_mode):
+    global terminal_output_data
+    try:
+        # Start the subprocess using Popen to capture stdout and stderr
+        process = subprocess.Popen(
+            ['python', 'main.py', '--mode', selected_mode],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True
+        )
+
+        # Read the terminal outputs in real-time and update global variable
+        for stdout_line in iter(process.stdout.readline, ""):
+            terminal_output_data += stdout_line.strip() + "\n"
+        
+        process.stdout.close()
+        process.wait()
+
+    except subprocess.CalledProcessError as e:
+        terminal_output_data += f"Error running {selected_mode} mode: {str(e)}\n"
+
+# Callback to start the subprocess in a new thread
 @app.callback(
-    [Output('status', 'children'), Output('progress', 'value'), Output('terminal-output', 'value')],
+    Output('status', 'children'),
+    Output('progress', 'value'),
     Input('run-button', 'n_clicks'),
     State('mode-selector', 'value'),
     prevent_initial_call=True,
 )
 def run_mode(n_clicks, selected_mode):
-    max_retries = 3  # Number of retries before giving up
-    retries = 0
-    terminal_output = ""  # Initialize the output string
-    
-    while retries < max_retries:
-        try:
-            # Start the subprocess using Popen to capture stdout and stderr
-            process = subprocess.Popen(
-                ['python', 'main.py', '--mode', selected_mode],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True
-            )
+    global terminal_output_data
+    terminal_output_data = ""  # Reset terminal output when running a new mode
+    threading.Thread(target=run_subprocess, args=(selected_mode,)).start()
+    return f"Running {selected_mode.capitalize()} mode...", 50
 
-            # Read the terminal outputs in real-time and update the text area
-            for stdout_line in iter(process.stdout.readline, ""):
-                terminal_output += stdout_line.strip() + "\n"
-                yield "", 50, terminal_output  # Progress stays at 50 while running
-
-            process.stdout.close()
-            return_code = process.wait()
-
-            # If the subprocess finishes successfully
-            if return_code == 0:
-                return (
-                    f"{selected_mode.capitalize()} mode has finished running. See results in output/'{selected_mode}'.",
-                    100,  # Progress is complete
-                    terminal_output
-                )
-
-            # If the subprocess encounters an error, raise an exception to trigger retry
-            else:
-                raise subprocess.CalledProcessError(return_code, ['python', 'main.py', '--mode', selected_mode])
-
-        except subprocess.CalledProcessError as e:
-            retries += 1
-            error_message = f"Error running {selected_mode} mode (attempt {retries}/{max_retries}). Retrying...\n"
-            terminal_output += error_message
-            with open('error_log.txt', 'a') as log_file:
-                log_file.write(f"{datetime.now()}: Error running {selected_mode} mode: {str(e)}\n")
-            if retries >= max_retries:
-                return f"Failed to run {selected_mode} mode after {max_retries} attempts. Please check the log file.", 0, terminal_output
-
-        # Wait for a short time before retrying
-        time.sleep(5)
-
+# Callback to update the terminal output every interval
+@app.callback(
+    Output('terminal-output', 'value'),
+    Input('interval-component', 'n_intervals'),
+)
+def update_terminal_output(n):
+    global terminal_output_data
+    return terminal_output_data
