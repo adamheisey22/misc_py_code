@@ -1,49 +1,47 @@
 import os
 import pandas as pd
-from sqlalchemy import create_engine, Column, Integer, Float, String, Boolean, MetaData
-from sqlalchemy.orm import declarative_base, sessionmaker
 import numpy as np
 
-# Database connection settings
-DB_URL = "postgresql+psycopg2://your_username:your_password@localhost:5432/your_database"
+# Path to the folder containing CSV files
 FOLDER_PATH = "cem_inputs"
-
-# Create database engine and session
-engine = create_engine(DB_URL)
-Session = sessionmaker(bind=engine)
-session = Session()
-
-# Ensure the schema exists
-with engine.connect() as conn:
-    conn.execute("CREATE SCHEMA IF NOT EXISTS electricity;")
-    conn.commit()
-
-# Base class for ORM models
-Base = declarative_base(metadata=MetaData(schema="electricity"))
 
 # Function to infer SQLAlchemy column types based on Pandas dtypes
 def infer_sqlalchemy_type(series):
     if np.issubdtype(series.dtype, np.integer):
-        return Integer
+        return "Integer"
     elif np.issubdtype(series.dtype, np.floating):
-        return Float
+        return "Float"
     elif np.issubdtype(series.dtype, np.bool_):
-        return Boolean
+        return "Boolean"
     else:
-        return String  # Default to String for object or unknown types
+        return "String"  # Default to String for text/mixed types
 
-# Function to dynamically create ORM table classes
-def create_table_class(table_name, df):
-    attrs = {"__tablename__": table_name, "__table_args__": {"schema": "electricity"}}
-    attrs["id"] = Column(Integer, primary_key=True, autoincrement=True)  # Auto ID column
+# Template for the definitions file
+definitions = '''"""
+Auto-generated SQLAlchemy ORM definitions for the electricity schema.
 
-    for col in df.columns:
-        col_type = infer_sqlalchemy_type(df[col])
-        attrs[col] = Column(col_type)
+This file defines ORM classes for tables based on CSV files.
+"""
 
-    return type(table_name, (Base,), attrs)
+from sqlalchemy import Column, Integer, Float, String, Boolean, create_engine, MetaData
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Iterate over CSV files in the folder
+# Database connection settings
+DB_URL = "postgresql+psycopg2://your_username:your_password@localhost:5432/your_database"
+
+# Create database engine
+engine = create_engine(DB_URL)
+
+# Create session
+Session = sessionmaker(bind=engine)
+session = Session()
+
+# Base class for ORM models
+Base = declarative_base(metadata=MetaData(schema="electricity"))
+
+'''
+
+# Iterate over CSV files to generate ORM classes
 for filename in os.listdir(FOLDER_PATH):
     if filename.endswith(".csv"):
         table_name = filename.replace(".csv", "").lower()
@@ -52,16 +50,22 @@ for filename in os.listdir(FOLDER_PATH):
         # Load CSV into DataFrame
         df = pd.read_csv(file_path)
 
-        # Dynamically create table class
-        TableClass = create_table_class(table_name, df)
+        # Start defining class
+        class_def = f"\nclass {table_name.capitalize()}(Base):\n"
+        class_def += f'    __tablename__ = "{table_name}"\n'
+        class_def += '    __table_args__ = {"schema": "electricity"}\n\n'
+        class_def += '    id = Column(Integer, primary_key=True, autoincrement=True)\n'
 
-        # Create table in database
-        Base.metadata.create_all(engine)
+        # Define columns
+        for col in df.columns:
+            col_type = infer_sqlalchemy_type(df[col])
+            class_def += f'    {col} = Column({col_type})\n'
 
-        # Insert data into table
-        df.to_sql(table_name, engine, schema="electricity", if_exists="append", index=False)
+        # Append class definition to the script
+        definitions += class_def
 
-        print(f"Table '{table_name}' created with inferred column types and data loaded.")
+# Write to `elec_definitions.py`
+with open("elec_definitions.py", "w") as f:
+    f.write(definitions)
 
-# Close session
-session.close()
+print("Generated elec_definitions.py with ORM class definitions.")
