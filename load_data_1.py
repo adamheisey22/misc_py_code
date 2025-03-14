@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select, exists
 import importlib
 
 # Database connection settings
@@ -72,13 +72,27 @@ for schema, module_name in SCHEMA_DEFINITIONS.items():
                         print(f"⚠️ Warning: CSV '{filename}' is empty. Skipping.")
                         continue
 
+                    # Check if data already exists
+                    primary_key_column = "id" if "id" in df.columns else None  # Assuming 'id' as primary key
+
+                    if primary_key_column:
+                        # Filter out records that already exist in the database
+                        existing_ids = set(
+                            session.scalars(select(TableClass.id)).all()
+                        )
+                        df = df[~df[primary_key_column].astype(str).isin(map(str, existing_ids))]
+
+                        if df.empty:
+                            print(f"⚠️ All records in '{filename}' already exist. Skipping.")
+                            continue
+
                     # Convert dataframe to a list of dictionaries for ORM bulk insert
                     records = df.to_dict(orient="records")
 
-                    # Bulk insert data
+                    # Bulk insert only non-duplicate data
                     session.bulk_insert_mappings(TableClass, records)
                     session.commit()
-                    print(f"✅ Loaded data into table '{table_name}' in schema '{schema}'.")
+                    print(f"✅ Loaded {len(records)} new records into '{table_name}' in schema '{schema}'.")
 
                 else:
                     print(f"⚠️ Warning: Table '{table_name}' is not defined in ORM. Skipping.")
